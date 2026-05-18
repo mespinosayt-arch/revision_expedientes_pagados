@@ -1,511 +1,76 @@
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consulta Expedientes ANID</title>
 
-<script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  // ============================================================
-  // SUPABASE
-  // ============================================================
-
-  const SUPABASE_URL = 'TU_URL';
-  const SUPABASE_KEY = 'TU_KEY';
-
-  const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-  );
-
-  // ============================================================
-  // NOMBRES DEPARTAMENTOS
-  // ============================================================
-
-  const NOMBRES_DEP = {
-    "capital_humano": "Capital Humano",
-    "investigacion": "Investigación",
-    "centros": "Centros e Investigación Asociativa",
-    "redes": "Redes, Estrategia e Innovación",
-    "finanzas": "Finanzas y Administración",
-    "otros": "Otros"
-  };
-
-  // ============================================================
-  // VARIABLES GLOBALES
-  // ============================================================
-
-  let datosExcel = [];
-  let cargado = false;
-  let tipoBusqueda = 'ted';
-
-  // ============================================================
-  // LOGIN SIMPLE TEMPORAL
-  // ============================================================
-
-  function verificarPassword() {
-
-    const dep = document.getElementById('departamento').value;
-    const pass = document.getElementById('password').value;
-    const error = document.getElementById('errorLogin');
-
-    if (!dep) {
-
-      error.textContent = '⚠️ Selecciona tu departamento';
-      error.style.display = 'block';
-
-      setTimeout(() => {
-        error.style.display = 'none';
-      }, 3000);
-
-      return;
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      padding: 30px;
     }
 
-    // LOGIN TEMPORAL
-    // DESPUÉS SE CAMBIARÁ POR MICROSOFT LOGIN
-
-    if (pass === "anid2026") {
-
-      sessionStorage.setItem('autenticado', 'si');
-      sessionStorage.setItem('departamento', dep);
-
-      mostrarApp();
-
-    } else {
-
-      error.textContent = '❌ Contraseña incorrecta';
-      error.style.display = 'block';
-
-      document.getElementById('password').value = '';
-
-      setTimeout(() => {
-        error.style.display = 'none';
-      }, 3000);
-    }
-  }
-
-  // ============================================================
-  // MOSTRAR APP
-  // ============================================================
-
-  function mostrarApp() {
-
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-
-    const dep = sessionStorage.getItem('departamento');
-
-    document.getElementById('depBadge').textContent =
-      NOMBRES_DEP[dep] || dep;
-
-    cargarDatos();
-  }
-
-  // ============================================================
-  // CERRAR SESIÓN
-  // ============================================================
-
-  function cerrarSesion() {
-
-    sessionStorage.removeItem('autenticado');
-    sessionStorage.removeItem('departamento');
-
-    location.reload();
-  }
-
-  // ============================================================
-  // CAMBIAR TABS
-  // ============================================================
-
-  function cambiarTab(tipo, ev) {
-
-    tipoBusqueda = tipo;
-
-    document.querySelectorAll('.search-tabs button')
-      .forEach(b => b.classList.remove('active'));
-
-    ev.target.classList.add('active');
-
-    const input = document.getElementById('busqueda');
-
-    if (tipo === 'ted') {
-
-      input.placeholder = 'Ingresa el N° TED';
-
-    } else if (tipo === 'institucion') {
-
-      input.placeholder = 'Ingresa nombre institución';
-
-    } else if (tipo === 'rut') {
-
-      input.placeholder = 'Ingresa RUT institución';
+    .box {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
-    input.value = '';
-
-    document.getElementById('resultado')
-      .classList.remove('visible');
-
-    document.getElementById('listaResultados')
-      .classList.remove('visible');
-  }
-
-  // ============================================================
-  // CARGAR DATOS DESDE SUPABASE
-  // ============================================================
-
-  async function cargarDatos() {
-
-    mostrarStatus(
-      '⏳',
-      'Cargando datos desde Supabase...',
-      'info'
-    );
-
-    try {
-
-      const { data, error } = await supabase
-        .from('expedientes')
-        .select('*');
-
-      if (error) throw error;
-
-      datosExcel = data;
-
-      cargado = true;
-
-      mostrarStatus(
-        '✅',
-        `<strong>${datosExcel.length}</strong> expedientes cargados`,
-        'success'
-      );
-
-      document.getElementById('ultimaActualizacion').textContent =
-        'Última actualización: ' +
-        new Date().toLocaleString('es-CL');
-
-      setTimeout(() => {
-        ocultarStatus();
-      }, 3000);
-
-    } catch (error) {
-
-      console.error(error);
-
-      mostrarStatus(
-        '⚠️',
-        'Error cargando datos desde Supabase',
-        'error'
-      );
-    }
-  }
-
-  // ============================================================
-  // STATUS
-  // ============================================================
-
-  function mostrarStatus(icono, texto, tipo) {
-
-    const banner = document.getElementById('statusBanner');
-
-    banner.style.display = 'flex';
-
-    banner.className =
-      'info-banner' +
-      (tipo === 'error'
-        ? ' error-banner'
-        : tipo === 'success'
-        ? ' success'
-        : '');
-
-    document.getElementById('statusIcon').textContent = icono;
-
-    document.getElementById('statusText').innerHTML = texto;
-  }
-
-  function ocultarStatus() {
-
-    document.getElementById('statusBanner').style.display = 'none';
-  }
-
-  // ============================================================
-  // BUSCAR
-  // ============================================================
-
-  function buscar() {
-
-    const termino = document
-      .getElementById('busqueda')
-      .value
-      .trim()
-      .toLowerCase();
-
-    document.getElementById('resultado')
-      .classList.remove('visible');
-
-    document.getElementById('listaResultados')
-      .classList.remove('visible');
-
-    if (!termino) return;
-
-    if (!cargado) {
-
-      mostrarStatus(
-        '⚠️',
-        'Datos aún cargando...',
-        'error'
-      );
-
-      return;
+    h1 {
+      color: #0033A0;
     }
 
-    let resultados = [];
-
-    if (tipoBusqueda === 'ted') {
-
-      resultados = datosExcel.filter(fila =>
-        String(fila.numero_ted || '')
-          .toLowerCase()
-          .includes(termino)
-      );
-
-    } else if (tipoBusqueda === 'institucion') {
-
-      resultados = datosExcel.filter(fila =>
-        String(fila.nombre_institucion || '')
-          .toLowerCase()
-          .includes(termino)
-      );
-
-    } else if (tipoBusqueda === 'rut') {
-
-      resultados = datosExcel.filter(fila =>
-        String(fila.rut || '')
-          .toLowerCase()
-          .replace(/[.\-\s]/g, '')
-          .includes(
-            termino.replace(/[.\-\s]/g, '')
-          )
-      );
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
     }
 
-    if (resultados.length === 0) {
-
-      mostrarSinResultado(termino);
-
-    } else if (resultados.length === 1) {
-
-      mostrarResultado(resultados[0]);
-
-    } else {
-
-      mostrarListaResultados(resultados);
+    button {
+      margin-top: 10px;
+      padding: 12px 20px;
+      border: none;
+      background: #0033A0;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
     }
-  }
 
-  // ============================================================
-  // MOSTRAR LISTA
-  // ============================================================
+    .resultado {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f4ff;
+      border-radius: 8px;
+    }
 
-  function mostrarListaResultados(resultados) {
+    .error {
+      color: red;
+      margin-top: 15px;
+    }
 
-    const div = document.getElementById('listaResultados');
+    .ok {
+      color: green;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
 
-    const contenido =
-      document.getElementById('listaContenido');
+<div class="box">
 
-    const titulo =
-      document.getElementById('listaTitulo');
+  <h1>Consulta Expedientes ANID</h1>
 
-    titulo.textContent =
-      `📋 ${resultados.length} resultados`;
+  <p>Buscar por número TED</p>
 
-    contenido.innerHTML = resultados.map((r, i) => {
+  <input type="text" id="ted" placeholder="Ejemplo: E648/2026">
 
-      return `
-        <div class="resultado-item"
-             onclick="mostrarResultadoPorIndice(${i})">
-
-          <div class="ted">
-            📄 ${r.numero_ted || '—'}
-          </div>
-
-          <div class="info">
-            <strong>${r.nombre_institucion || '—'}</strong>
-            · ${r.monto_total || '—'}
-          </div>
-
-        </div>
-      `;
-    }).join('');
-
-    window._resultadosActuales = resultados;
-
-    div.classList.add('visible');
-  }
-
-  function mostrarResultadoPorIndice(i) {
-
-    mostrarResultado(window._resultadosActuales[i]);
-  }
-
-  // ============================================================
-  // MOSTRAR RESULTADO
-  // ============================================================
-
-  function mostrarResultado(d) {
-
-    const div = document.getElementById('resultado');
-
-    div.classList.add('visible');
-
-    div.innerHTML = `
-
-      <div class="resultado-header">
-
-        <h3>📄 ${d.numero_ted || '—'}</h3>
-
-        <button class="btn-volver"
-          onclick="
-            document.getElementById('resultado')
-            .classList.remove('visible')
-          ">
-          ← Volver
-        </button>
-
-      </div>
-
-      <div class="seccion">
-
-        <h4>💰 Información General</h4>
-
-        <div class="grid">
-
-          <div class="dato">
-            <span class="label">Fecha Ingreso</span>
-            <span class="valor">${d.fecha_ingreso || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Fecha Pago</span>
-            <span class="valor">${d.fecha_pago || '—'}</span>
-          </div>
-
-          <div class="dato destacado">
-            <span class="label">Monto Total</span>
-            <span class="valor">${d.monto_total || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Analista</span>
-            <span class="valor">${d.analista || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Tipo Pago</span>
-            <span class="valor">${d.tipo_pago || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Moneda</span>
-            <span class="valor">${d.moneda || '—'}</span>
-          </div>
-
-        </div>
-
-      </div>
-
-      <div class="seccion">
-
-        <h4>📋 Datos Administrativos</h4>
-
-        <div class="grid">
-
-          <div class="dato">
-            <span class="label">ID Docusign</span>
-            <span class="valor">${d.id_docusign || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Comprobante Egreso</span>
-            <span class="valor">${d.comprobante_egreso || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">PP</span>
-            <span class="valor">${d.pp || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Fecha Nómina</span>
-            <span class="valor">${d.fecha_nomina || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">N° Nómina</span>
-            <span class="valor">${d.numero_nomina || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Centro Costo</span>
-            <span class="valor">${d.centro_costo || '—'}</span>
-          </div>
-
-          <div class="dato">
-            <span class="label">Cuenta Corriente</span>
-            <span class="valor">${d.cuenta_corriente || '—'}</span>
-          </div>
-
-        </div>
-
-      </div>
-
-    `;
-
-    div.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start'
-    });
-  }
-
-  // ============================================================
-  // SIN RESULTADOS
-  // ============================================================
-
-  function mostrarSinResultado(termino) {
-
-    const div = document.getElementById('resultado');
-
-    div.classList.add('visible');
-
-    div.innerHTML = `
-      <div class="no-resultado">
-
-        <div class="icon">🔍</div>
-
-        <h3>Sin resultados</h3>
-
-        <p>
-          No se encontraron resultados para:
-          <strong>${termino}</strong>
-        </p>
-
-      </div>
-    `;
-  }
-
-  // ============================================================
-  // INICIALIZACIÓN
-  // ============================================================
-
-  if (sessionStorage.getItem('autenticado') === 'si') {
-
-    mostrarApp();
-  }
-
-  document.getElementById('password')
-    .addEventListener('keypress', (e) => {
-
-      if (e.key === 'Enter') {
-
-        verificarPassword();
-      }
-    });
-
-</script>
+</html>
