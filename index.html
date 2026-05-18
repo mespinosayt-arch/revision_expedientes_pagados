@@ -82,7 +82,7 @@ body{
   font-size:14px;
 }
 
-.estado{
+.estado-top{
   padding:10px 18px;
   border-radius:8px;
   background:#ecfdf5;
@@ -283,12 +283,12 @@ body{
 
       <div>
         <h1>Consulta Expedientes ANID</h1>
-        <p>Sistema interno de consulta de expedientes y pagos</p>
+        <p>Sistema interno de consulta de pagos</p>
       </div>
 
     </div>
 
-    <div class="estado">
+    <div class="estado-top">
       Plataforma Operativa
     </div>
 
@@ -299,19 +299,19 @@ body{
     <h2>Buscar Expediente</h2>
 
     <p>
-      Ingresa el número TED del expediente
+      Ingresa el número TED exacto
     </p>
 
     <div class="search-row">
 
-      <input 
+      <input
         type="text"
         id="ted"
         placeholder="Ejemplo: E648/2026"
       >
 
       <button onclick="buscarExpediente()">
-        Buscar Expediente
+        Buscar
       </button>
 
     </div>
@@ -338,7 +338,7 @@ const SUPABASE_URL = 'https://elwugzjpfpxjyoyeeoaf.supabase.co';
 
 const SUPABASE_KEY = 'sb_publishable_imAQfXVuTQYav4-KM5R1rg_1eJnm8t5';
 
-const clienteSupabase = window.supabase.createClient(
+const clienteSupabase = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
@@ -390,7 +390,10 @@ window.onload = async () => {
 
 async function buscarExpediente(){
 
-  const ted = document.getElementById('ted').value.trim();
+  const ted = document
+    .getElementById('ted')
+    .value
+    .trim();
 
   const resultado = document.getElementById('resultado');
 
@@ -409,19 +412,29 @@ async function buscarExpediente(){
     const { data, error } = await clienteSupabase
       .from('expedientes')
       .select('*')
-      .ilike('N° TED', `%${ted}%`);
+      .eq('numero_ted', ted);
 
     if(error){
 
       console.error(error);
 
-      alert('Error consultando');
+      resultado.innerHTML = `
+        <div class="seccion">
+
+          <h2>Error</h2>
+
+          <p>
+            Error consultando Supabase
+          </p>
+
+        </div>
+      `;
 
       return;
 
     }
 
-    if(data.length === 0){
+    if(!data || data.length === 0){
 
       resultado.innerHTML = `
         <div class="seccion">
@@ -451,9 +464,10 @@ async function buscarExpediente(){
         </h2>
 
         <div class="grid">
+
     `;
 
-    for (const campo in d) {
+    for(const campo in d){
 
       html += `
 
@@ -464,17 +478,21 @@ async function buscarExpediente(){
           </div>
 
           <div class="valor">
-            ${d[campo] || '-'}
+            ${d[campo] ?? '-'}
           </div>
 
         </div>
 
       `;
+
     }
 
     html += `
+
         </div>
+
       </div>
+
     `;
 
     resultado.innerHTML = html;
@@ -483,7 +501,17 @@ async function buscarExpediente(){
 
     console.error(err);
 
-    alert('Error general');
+    resultado.innerHTML = `
+      <div class="seccion">
+
+        <h2>Error General</h2>
+
+        <p>
+          Ocurrió un problema consultando el expediente
+        </p>
+
+      </div>
+    `;
 
   }
 
