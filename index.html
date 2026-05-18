@@ -2,75 +2,171 @@
 <html lang="es">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consulta Expedientes ANID</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
+<title>Consulta Expedientes ANID</title>
 
-    body{
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+
+*{
   margin:0;
-  padding:40px;
-  background:#eef2f7;
-  font-family:Arial, sans-serif;
+  padding:0;
+  box-sizing:border-box;
+}
+
+:root{
+  --azul:#0033A0;
+  --azul2:#002171;
+  --gris:#eef2f7;
+  --texto:#1f2937;
+  --borde:#dbe3ee;
+  --verde:#10b981;
+  --rojo:#ef4444;
+}
+
+body{
+  background:linear-gradient(135deg,#0033A0 0%,#002171 100%);
+  font-family:Arial,sans-serif;
+  min-height:100vh;
+  padding:30px;
+  color:var(--texto);
 }
 
 .container{
-  max-width:1200px;
+  max-width:1300px;
   margin:auto;
 }
 
 .header{
   background:white;
-  padding:25px;
-  border-radius:14px;
+  border-radius:18px;
+  padding:25px 30px;
   margin-bottom:20px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.08);
-  border-left:6px solid #0033A0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+  border-top:5px solid var(--azul);
+}
+
+.header-left{
+  display:flex;
+  align-items:center;
+  gap:18px;
+}
+
+.logo{
+  width:60px;
+  height:60px;
+  border-radius:14px;
+  background:var(--azul);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
+  font-size:30px;
 }
 
 .header h1{
-  margin:0;
-  color:#0033A0;
+  color:var(--azul);
+  font-size:28px;
+  margin-bottom:5px;
 }
 
 .header p{
-  margin-top:5px;
   color:#666;
+  font-size:14px;
+}
+
+.estado{
+  padding:10px 18px;
+  border-radius:8px;
+  background:#ecfdf5;
+  color:#065f46;
+  font-weight:bold;
+  font-size:14px;
 }
 
 .buscador{
   background:white;
-  padding:20px;
-  border-radius:14px;
+  border-radius:18px;
+  padding:25px;
   margin-bottom:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+}
+
+.buscador h2{
+  color:var(--azul);
+  margin-bottom:8px;
+}
+
+.buscador p{
+  color:#666;
+  margin-bottom:20px;
+  font-size:14px;
+}
+
+.search-row{
   display:flex;
-  gap:10px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  gap:12px;
 }
 
-.buscador input{
+.search-row input{
   flex:1;
-  padding:14px;
-  border:1px solid #ccc;
-  border-radius:8px;
-  font-size:15px;
+  padding:16px;
+  border:2px solid var(--borde);
+  border-radius:10px;
+  font-size:16px;
+  transition:0.2s;
 }
 
-.buscador button{
-  padding:14px 24px;
-  background:#0033A0;
+.search-row input:focus{
+  outline:none;
+  border-color:var(--azul);
+  box-shadow:0 0 0 4px rgba(0,51,160,0.1);
+}
+
+.search-row button{
+  background:var(--azul);
   color:white;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
+  padding:16px 28px;
+  font-size:15px;
+  font-weight:bold;
   cursor:pointer;
+  transition:0.2s;
+}
+
+.search-row button:hover{
+  background:var(--azul2);
+  transform:translateY(-1px);
+}
+
+#estado{
+  margin-top:15px;
+}
+
+.ok{
+  background:#ecfdf5;
+  color:#065f46;
+  padding:14px;
+  border-radius:10px;
+  border-left:5px solid var(--verde);
   font-weight:bold;
 }
 
-.buscador button:hover{
-  background:#002171;
+.error{
+  background:#fef2f2;
+  color:#991b1b;
+  padding:14px;
+  border-radius:10px;
+  border-left:5px solid var(--rojo);
+  font-weight:bold;
 }
 
 #resultado{
@@ -79,64 +175,160 @@
 
 .seccion{
   background:white;
-  padding:20px;
-  border-radius:14px;
+  border-radius:18px;
+  padding:25px;
   margin-bottom:20px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
 }
 
 .seccion h2{
-  margin-top:0;
-  color:#0033A0;
-  border-bottom:2px solid #eef2f7;
-  padding-bottom:10px;
+  color:var(--azul);
+  margin-bottom:20px;
+  padding-bottom:12px;
+  border-bottom:3px solid var(--gris);
 }
 
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
-  gap:15px;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:16px;
 }
 
 .campo{
   background:#f8fafc;
-  padding:12px;
-  border-radius:8px;
+  border-radius:12px;
+  padding:16px;
+  border-left:4px solid var(--azul);
+  transition:0.2s;
+}
+
+.campo:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
 }
 
 .label{
-  font-size:12px;
-  color:#666;
-  margin-bottom:5px;
-  font-weight:bold;
+  font-size:11px;
   text-transform:uppercase;
+  color:#64748b;
+  margin-bottom:8px;
+  font-weight:bold;
+  letter-spacing:0.5px;
 }
 
 .valor{
   font-size:15px;
-  color:#111;
+  color:#111827;
   word-break:break-word;
+  line-height:1.4;
 }
 
-  </style>
+.footer{
+  text-align:center;
+  margin-top:30px;
+  color:white;
+  opacity:0.9;
+  font-size:13px;
+}
+
+.footer span{
+  display:inline-block;
+  margin-top:8px;
+  background:rgba(255,255,255,0.1);
+  padding:6px 14px;
+  border-radius:20px;
+}
+
+@media(max-width:768px){
+
+  body{
+    padding:15px;
+  }
+
+  .header{
+    flex-direction:column;
+    gap:15px;
+    text-align:center;
+  }
+
+  .header-left{
+    flex-direction:column;
+  }
+
+  .search-row{
+    flex-direction:column;
+  }
+
+  .grid{
+    grid-template-columns:1fr;
+  }
+
+}
+
+</style>
 
 </head>
 
 <body>
 
-<div class="box">
+<div class="container">
 
-  <h1>Consulta Expedientes ANID</h1>
+  <div class="header">
 
-  <input type="text" id="ted" placeholder="Ejemplo: E648/2026">
+    <div class="header-left">
 
-  <button onclick="buscarExpediente()">
-    Buscar
-  </button>
+      <div class="logo">
+        📋
+      </div>
 
-  <div id="estado"></div>
+      <div>
+        <h1>Consulta Expedientes ANID</h1>
+        <p>Sistema interno de consulta de expedientes y pagos</p>
+      </div>
 
-  <div id="resultado" class="resultado"></div>
+    </div>
+
+    <div class="estado">
+      Plataforma Operativa
+    </div>
+
+  </div>
+
+  <div class="buscador">
+
+    <h2>Buscar Expediente</h2>
+
+    <p>
+      Ingresa el número TED del expediente
+    </p>
+
+    <div class="search-row">
+
+      <input 
+        type="text"
+        id="ted"
+        placeholder="Ejemplo: E648/2026"
+      >
+
+      <button onclick="buscarExpediente()">
+        Buscar Expediente
+      </button>
+
+    </div>
+
+    <div id="estado"></div>
+
+  </div>
+
+  <div id="resultado"></div>
+
+  <div class="footer">
+    Plataforma Interna ANID
+    <br>
+    <span>
+      Creado por Marco Espinosa
+    </span>
+  </div>
 
 </div>
 
@@ -166,19 +358,31 @@ window.onload = async () => {
 
       console.error(error);
 
-      estado.innerHTML = '<div class="error">❌ Error conectando con Supabase</div>';
+      estado.innerHTML = `
+        <div class="error">
+          ❌ Error conectando con Supabase
+        </div>
+      `;
 
       return;
 
     }
 
-    estado.innerHTML = '<div class="ok">✅ Conectado correctamente a Supabase</div>';
+    estado.innerHTML = `
+      <div class="ok">
+        ✅ Conectado correctamente a Supabase
+      </div>
+    `;
 
   } catch(err){
 
     console.error(err);
 
-    estado.innerHTML = '<div class="error">❌ Error general</div>';
+    estado.innerHTML = `
+      <div class="error">
+        ❌ Error general
+      </div>
+    `;
 
   }
 
@@ -190,7 +394,7 @@ async function buscarExpediente(){
 
   const resultado = document.getElementById('resultado');
 
-  resultado.style.display = 'none';
+  resultado.innerHTML = '';
 
   if(!ted){
 
@@ -205,7 +409,7 @@ async function buscarExpediente(){
     const { data, error } = await clienteSupabase
       .from('expedientes')
       .select('*')
-      .eq('numero_ted', ted);
+      .ilike('N° TED', `%${ted}%`);
 
     if(error){
 
@@ -219,11 +423,17 @@ async function buscarExpediente(){
 
     if(data.length === 0){
 
-      resultado.style.display = 'block';
-
       resultado.innerHTML = `
-        <h3>No encontrado</h3>
-        <p>No existe el TED ${ted}</p>
+        <div class="seccion">
+
+          <h2>Sin resultados</h2>
+
+          <p>
+            No existe el expediente:
+            <strong>${ted}</strong>
+          </p>
+
+        </div>
       `;
 
       return;
@@ -232,49 +442,42 @@ async function buscarExpediente(){
 
     const d = data[0];
 
-    resultado.style.display = 'block';
-
     let html = `
-  <h2 style="
-    margin-bottom:20px;
-    color:#0033A0;
-  ">
-    Expediente Encontrado
-  </h2>
-`;
 
-for (const campo in d) {
+      <div class="seccion">
 
-  html += `
-    <div style="
-      padding:12px;
-      margin-bottom:10px;
-      background:#f4f6f9;
-      border-radius:8px;
-      border-left:4px solid #0033A0;
-    ">
+        <h2>
+          📄 Expediente Encontrado
+        </h2>
 
-      <div style="
-        font-size:13px;
-        color:#0033A0;
-        font-weight:bold;
-        margin-bottom:4px;
-      ">
-        ${campo}
+        <div class="grid">
+    `;
+
+    for (const campo in d) {
+
+      html += `
+
+        <div class="campo">
+
+          <div class="label">
+            ${campo}
+          </div>
+
+          <div class="valor">
+            ${d[campo] || '-'}
+          </div>
+
+        </div>
+
+      `;
+    }
+
+    html += `
+        </div>
       </div>
+    `;
 
-      <div style="
-        font-size:15px;
-        color:#222;
-      ">
-        ${d[campo] || '-'}
-      </div>
-
-    </div>
-  `;
-}
-
-resultado.innerHTML = html;
+    resultado.innerHTML = html;
 
   } catch(err){
 
