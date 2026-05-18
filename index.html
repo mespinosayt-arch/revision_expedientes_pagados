@@ -181,25 +181,47 @@ async function buscarExpediente(){
 
     resultado.style.display = 'block';
 
-    resultado.innerHTML = `
-      <h2>Expediente Encontrado</h2>
+    let html = `
+  <h2 style="
+    margin-bottom:20px;
+    color:#0033A0;
+  ">
+    Expediente Encontrado
+  </h2>
+`;
 
-      <p><strong>TED:</strong> ${d.numero_ted || '-'}</p>
+for (const campo in d) {
 
-      <p><strong>Fecha ingreso:</strong> ${d.fecha_ingreso || '-'}</p>
+  html += `
+    <div style="
+      padding:12px;
+      margin-bottom:10px;
+      background:#f4f6f9;
+      border-radius:8px;
+      border-left:4px solid #0033A0;
+    ">
 
-      <p><strong>Fecha pago:</strong> ${d.fecha_pago || '-'}</p>
+      <div style="
+        font-size:13px;
+        color:#0033A0;
+        font-weight:bold;
+        margin-bottom:4px;
+      ">
+        ${campo}
+      </div>
 
-      <p><strong>Analista:</strong> ${d.analista || '-'}</p>
+      <div style="
+        font-size:15px;
+        color:#222;
+      ">
+        ${d[campo] || '-'}
+      </div>
 
-      <p><strong>Monto:</strong> ${d.monto_total || '-'}</p>
+    </div>
+  `;
+}
 
-      <p><strong>Moneda:</strong> ${d.moneda || '-'}</p>
-
-      <p><strong>Tipo pago:</strong> ${d.tipo_pago || '-'}</p>
-
-      <p><strong>Nómina:</strong> ${d.numero_nomina || '-'}</p>
-    `;
+resultado.innerHTML = html;
 
   } catch(err){
 
