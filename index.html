@@ -223,6 +223,49 @@ body{
   line-height:1.4;
 }
 
+.estado-expediente{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:18px 22px;
+  border-radius:14px;
+  margin-bottom:24px;
+  font-size:17px;
+  font-weight:bold;
+  letter-spacing:0.3px;
+}
+
+.estado-expediente .icono{
+  font-size:28px;
+  line-height:1;
+}
+
+.estado-expediente .texto-estado{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+
+.estado-expediente .texto-estado small{
+  font-size:12px;
+  font-weight:normal;
+  opacity:0.8;
+}
+
+.estado-tramitado{
+  background:#ecfdf5;
+  color:#065f46;
+  border:2px solid #6ee7b7;
+  border-left:6px solid #10b981;
+}
+
+.estado-en-proceso{
+  background:#fffbeb;
+  color:#92400e;
+  border:2px solid #fcd34d;
+  border-left:6px solid #f59e0b;
+}
+
 .footer{
   text-align:center;
   margin-top:30px;
@@ -455,6 +498,26 @@ async function buscarExpediente(){
 
     const d = data[0];
 
+    const tienNomina = d.numero_nomina !== null && d.numero_nomina !== undefined && String(d.numero_nomina).trim() !== '';
+    const tienFechaPago = d.fecha_pago !== null && d.fecha_pago !== undefined && String(d.fecha_pago).trim() !== '';
+    const tramitado = tienNomina && tienFechaPago;
+
+    const badgeHTML = tramitado
+      ? `<div class="estado-expediente estado-tramitado">
+           <div class="icono">✅</div>
+           <div class="texto-estado">
+             <span>TRAMITADO</span>
+             <small>Nómina y fecha de pago registradas</small>
+           </div>
+         </div>`
+      : `<div class="estado-expediente estado-en-proceso">
+           <div class="icono">⏳</div>
+           <div class="texto-estado">
+             <span>EN PROCESO DE TRAMITACIÓN</span>
+             <small>Pendiente de nómina o fecha de pago</small>
+           </div>
+         </div>`;
+
     let html = `
 
       <div class="seccion">
@@ -462,6 +525,8 @@ async function buscarExpediente(){
         <h2>
           📄 Expediente Encontrado
         </h2>
+
+        ${badgeHTML}
 
         <div class="grid">
 
