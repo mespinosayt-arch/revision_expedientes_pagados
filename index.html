@@ -1,588 +1,474 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Consulta Expedientes ANID</title>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
-
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-}
-
+*{ margin:0; padding:0; box-sizing:border-box; }
 :root{
-  --azul:#0033A0;
-  --azul2:#002171;
-  --gris:#eef2f7;
-  --texto:#1f2937;
-  --borde:#dbe3ee;
-  --verde:#10b981;
-  --rojo:#ef4444;
+  --azul:#0033A0; --azul2:#002171; --gris:#eef2f7;
+  --texto:#1f2937; --borde:#dbe3ee; --verde:#10b981; --rojo:#ef4444;
 }
-
 body{
   background:linear-gradient(135deg,#0033A0 0%,#002171 100%);
-  font-family:Arial,sans-serif;
-  min-height:100vh;
-  padding:30px;
-  color:var(--texto);
+  font-family:Arial,sans-serif; min-height:100vh; padding:30px; color:var(--texto);
 }
 
-.container{
-  max-width:1300px;
-  margin:auto;
-}
-
-.header{
-  background:white;
-  border-radius:18px;
-  padding:25px 30px;
-  margin-bottom:20px;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  box-shadow:0 10px 30px rgba(0,0,0,0.15);
-  border-top:5px solid var(--azul);
-}
-
-.header-left{
-  display:flex;
-  align-items:center;
-  gap:18px;
-}
-
-.logo{
-  width:60px;
-  height:60px;
-  border-radius:14px;
-  background:var(--azul);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:white;
-  font-size:30px;
-}
-
-.header h1{
-  color:var(--azul);
-  font-size:28px;
-  margin-bottom:5px;
-}
-
-.header p{
-  color:#666;
-  font-size:14px;
-}
-
-.estado-top{
-  padding:10px 18px;
-  border-radius:8px;
-  background:#ecfdf5;
-  color:#065f46;
-  font-weight:bold;
-  font-size:14px;
-}
-
-.buscador{
-  background:white;
-  border-radius:18px;
-  padding:25px;
-  margin-bottom:20px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.15);
-}
-
-.buscador h2{
-  color:var(--azul);
-  margin-bottom:8px;
-}
-
-.buscador p{
-  color:#666;
-  margin-bottom:20px;
-  font-size:14px;
-}
-
-.search-row{
-  display:flex;
-  gap:12px;
-}
-
-.search-row input{
-  flex:1;
-  padding:16px;
-  border:2px solid var(--borde);
-  border-radius:10px;
-  font-size:16px;
-  transition:0.2s;
-}
-
-.search-row input:focus{
-  outline:none;
-  border-color:var(--azul);
-  box-shadow:0 0 0 4px rgba(0,51,160,0.1);
-}
-
-.search-row button{
-  background:var(--azul);
-  color:white;
-  border:none;
-  border-radius:10px;
-  padding:16px 28px;
-  font-size:15px;
-  font-weight:bold;
-  cursor:pointer;
-  transition:0.2s;
-}
-
-.search-row button:hover{
-  background:var(--azul2);
-  transform:translateY(-1px);
-}
-
-#estado{
-  margin-top:15px;
-}
-
-.ok{
-  background:#ecfdf5;
-  color:#065f46;
-  padding:14px;
-  border-radius:10px;
-  border-left:5px solid var(--verde);
-  font-weight:bold;
-}
-
-.error{
-  background:#fef2f2;
-  color:#991b1b;
-  padding:14px;
-  border-radius:10px;
-  border-left:5px solid var(--rojo);
-  font-weight:bold;
-}
-
-#resultado{
-  margin-top:20px;
-}
-
-.seccion{
-  background:white;
-  border-radius:18px;
-  padding:25px;
-  margin-bottom:20px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.15);
-}
-
-.seccion h2{
-  color:var(--azul);
-  margin-bottom:20px;
-  padding-bottom:12px;
-  border-bottom:3px solid var(--gris);
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-  gap:16px;
-}
-
-.campo{
-  background:#f8fafc;
-  border-radius:12px;
-  padding:16px;
-  border-left:4px solid var(--azul);
-  transition:0.2s;
-}
-
-.campo:hover{
-  transform:translateY(-2px);
-  box-shadow:0 4px 12px rgba(0,0,0,0.08);
-}
-
-.label{
-  font-size:11px;
-  text-transform:uppercase;
-  color:#64748b;
-  margin-bottom:8px;
-  font-weight:bold;
-  letter-spacing:0.5px;
-}
-
-.valor{
-  font-size:15px;
-  color:#111827;
-  word-break:break-word;
-  line-height:1.4;
-}
-
-.estado-expediente{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:18px 22px;
-  border-radius:14px;
-  margin-bottom:24px;
-  font-size:17px;
-  font-weight:bold;
-  letter-spacing:0.3px;
-}
-
-.estado-expediente .icono{
-  font-size:28px;
-  line-height:1;
-}
-
-.estado-expediente .texto-estado{
-  display:flex;
-  flex-direction:column;
-  gap:3px;
-}
-
-.estado-expediente .texto-estado small{
-  font-size:12px;
-  font-weight:normal;
-  opacity:0.8;
-}
-
-.estado-tramitado{
-  background:#ecfdf5;
-  color:#065f46;
-  border:2px solid #6ee7b7;
-  border-left:6px solid #10b981;
-}
-
-.estado-en-proceso{
-  background:#fffbeb;
-  color:#92400e;
-  border:2px solid #fcd34d;
-  border-left:6px solid #f59e0b;
-}
-
-.footer{
+/* ══ AUTH CARD ══ */
+.auth-card{
+  max-width:420px; margin:60px auto 0; background:white;
+  border-radius:20px; padding:40px 36px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.25); border-top:5px solid var(--azul);
   text-align:center;
-  margin-top:30px;
-  color:white;
-  opacity:0.9;
-  font-size:13px;
+}
+.auth-logo{
+  width:70px; height:70px; border-radius:16px; background:var(--azul);
+  display:flex; align-items:center; justify-content:center;
+  color:white; font-size:34px; margin:0 auto 20px;
+}
+.auth-card h2{ color:var(--azul); font-size:22px; margin-bottom:6px; }
+.auth-card .subtitulo{ color:#666; font-size:14px; margin-bottom:28px; }
+
+.auth-tabs{
+  display:flex; border-radius:10px; background:#f1f5f9;
+  padding:4px; margin-bottom:24px; gap:4px;
+}
+.auth-tab{
+  flex:1; padding:9px; border:none; border-radius:8px; font-size:14px;
+  font-weight:bold; cursor:pointer; background:transparent; color:#64748b; transition:0.2s;
+}
+.auth-tab.activo{ background:white; color:var(--azul); box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+
+.auth-field{ margin-bottom:14px; text-align:left; }
+.auth-field label{ display:block; font-size:12px; font-weight:bold; color:#64748b; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
+.auth-field input{
+  width:100%; padding:13px 16px; border:2px solid var(--borde);
+  border-radius:10px; font-size:15px; transition:0.2s;
+}
+.auth-field input:focus{ outline:none; border-color:var(--azul); box-shadow:0 0 0 4px rgba(0,51,160,0.1); }
+
+.pass-wrap{ position:relative; }
+.pass-wrap input{ padding-right:46px; }
+.toggle-pass{
+  position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  background:none; border:none; cursor:pointer; font-size:18px; color:#94a3b8;
 }
 
-.footer span{
-  display:inline-block;
-  margin-top:8px;
-  background:rgba(255,255,255,0.1);
-  padding:6px 14px;
-  border-radius:20px;
+.btn-auth{
+  width:100%; background:var(--azul); color:white; border:none;
+  border-radius:10px; padding:14px; font-size:15px; font-weight:bold;
+  cursor:pointer; transition:0.2s; margin-top:6px;
 }
+.btn-auth:hover{ background:var(--azul2); }
+.btn-auth:disabled{ opacity:0.6; cursor:not-allowed; }
 
+.msg{
+  margin-top:16px; padding:12px 16px; border-radius:10px;
+  font-size:14px; font-weight:bold; text-align:left; line-height:1.5;
+}
+.msg-ok{ background:#ecfdf5; color:#065f46; border-left:4px solid var(--verde); }
+.msg-err{ background:#fef2f2; color:#991b1b; border-left:4px solid var(--rojo); }
+
+.hint{ margin-top:14px; font-size:12px; color:#94a3b8; }
+
+.pass-req{
+  background:#f8fafc; border-radius:8px; padding:10px 14px; margin-bottom:14px; text-align:left;
+}
+.pass-req p{ font-size:12px; color:#64748b; margin-bottom:6px; font-weight:bold; }
+.pass-req ul{ list-style:none; display:flex; flex-direction:column; gap:3px; }
+.pass-req li{ font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:6px; transition:0.2s; }
+.pass-req li.ok{ color:#10b981; font-weight:bold; }
+.pass-req li::before{ content:'○'; font-size:10px; }
+.pass-req li.ok::before{ content:'✓'; }
+
+/* ══ APP ══ */
+#pantalla-app{ display:none; }
+.container{ max-width:1300px; margin:auto; }
+.header{
+  background:white; border-radius:18px; padding:25px 30px; margin-bottom:20px;
+  display:flex; justify-content:space-between; align-items:center;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15); border-top:5px solid var(--azul);
+}
+.header-left{ display:flex; align-items:center; gap:18px; }
+.logo{
+  width:60px; height:60px; border-radius:14px; background:var(--azul);
+  display:flex; align-items:center; justify-content:center; color:white; font-size:30px;
+}
+.header h1{ color:var(--azul); font-size:28px; margin-bottom:5px; }
+.header p{ color:#666; font-size:14px; }
+.header-right{ display:flex; align-items:center; gap:12px; }
+.usuario-badge{
+  padding:8px 14px; border-radius:8px; background:#eef2f7;
+  color:var(--azul); font-size:13px; font-weight:bold;
+}
+.btn-salir{
+  padding:8px 16px; border-radius:8px; background:#fef2f2;
+  color:#991b1b; border:none; font-size:13px; font-weight:bold; cursor:pointer; transition:0.2s;
+}
+.btn-salir:hover{ background:#fee2e2; }
+.buscador{
+  background:white; border-radius:18px; padding:25px; margin-bottom:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+}
+.buscador h2{ color:var(--azul); margin-bottom:8px; }
+.buscador p{ color:#666; margin-bottom:20px; font-size:14px; }
+.search-row{ display:flex; gap:12px; }
+.search-row input{
+  flex:1; padding:16px; border:2px solid var(--borde); border-radius:10px; font-size:16px; transition:0.2s;
+}
+.search-row input:focus{ outline:none; border-color:var(--azul); box-shadow:0 0 0 4px rgba(0,51,160,0.1); }
+.search-row button{
+  background:var(--azul); color:white; border:none; border-radius:10px;
+  padding:16px 28px; font-size:15px; font-weight:bold; cursor:pointer; transition:0.2s;
+}
+.search-row button:hover{ background:var(--azul2); transform:translateY(-1px); }
+#resultado{ margin-top:20px; }
+.seccion{
+  background:white; border-radius:18px; padding:25px; margin-bottom:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.15);
+}
+.seccion h2{ color:var(--azul); margin-bottom:20px; padding-bottom:12px; border-bottom:3px solid var(--gris); }
+.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
+.campo{ background:#f8fafc; border-radius:12px; padding:16px; border-left:4px solid var(--azul); transition:0.2s; }
+.campo:hover{ transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.08); }
+.label{ font-size:11px; text-transform:uppercase; color:#64748b; margin-bottom:8px; font-weight:bold; letter-spacing:0.5px; }
+.valor{ font-size:15px; color:#111827; word-break:break-word; line-height:1.4; }
+.estado-expediente{
+  display:flex; align-items:center; gap:14px; padding:18px 22px;
+  border-radius:14px; margin-bottom:24px; font-size:17px; font-weight:bold;
+}
+.estado-expediente .icono{ font-size:28px; line-height:1; }
+.estado-expediente .texto-estado{ display:flex; flex-direction:column; gap:3px; }
+.estado-expediente .texto-estado small{ font-size:12px; font-weight:normal; opacity:0.8; }
+.estado-tramitado{ background:#ecfdf5; color:#065f46; border:2px solid #6ee7b7; border-left:6px solid #10b981; }
+.estado-en-proceso{ background:#fffbeb; color:#92400e; border:2px solid #fcd34d; border-left:6px solid #f59e0b; }
+.btn-ce-wrap{ margin-bottom:24px; }
+.btn-ce{
+  display:inline-flex; align-items:center; gap:10px; background:#dc2626;
+  color:white; border:none; border-radius:12px; padding:14px 24px;
+  font-size:15px; font-weight:bold; cursor:pointer; text-decoration:none;
+  transition:0.2s; box-shadow:0 4px 14px rgba(220,38,38,0.3);
+}
+.btn-ce:hover{ background:#b91c1c; transform:translateY(-2px); }
+.btn-ce .pdf-icon{ font-size:20px; }
+.btn-ce .carpeta-hint{ font-size:12px; font-weight:normal; opacity:0.85; }
+.btn-ce-aviso{
+  display:inline-flex; align-items:center; gap:8px; background:#f1f5f9;
+  color:#64748b; border-radius:10px; padding:12px 18px; font-size:14px; border-left:4px solid #cbd5e1;
+}
+.footer{ text-align:center; margin-top:30px; color:white; opacity:0.9; font-size:13px; }
+.footer span{ display:inline-block; margin-top:8px; background:rgba(255,255,255,0.1); padding:6px 14px; border-radius:20px; }
 @media(max-width:768px){
-
-  body{
-    padding:15px;
-  }
-
-  .header{
-    flex-direction:column;
-    gap:15px;
-    text-align:center;
-  }
-
-  .header-left{
-    flex-direction:column;
-  }
-
-  .search-row{
-    flex-direction:column;
-  }
-
-  .grid{
-    grid-template-columns:1fr;
-  }
-
+  body{ padding:15px; }
+  .header{ flex-direction:column; gap:15px; text-align:center; }
+  .header-left,.header-right{ flex-direction:column; }
+  .search-row{ flex-direction:column; }
+  .grid{ grid-template-columns:1fr; }
 }
-
 </style>
-
 </head>
-
 <body>
 
+<!-- ══ AUTH ══ -->
+<div id="pantalla-auth">
+  <div class="auth-card">
+    <div class="auth-logo">📋</div>
+    <h2>Consulta Expedientes ANID</h2>
+    <p class="subtitulo">Acceso exclusivo con correo institucional</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab activo" id="tab-login"    onclick="cambiarTab('login')">Iniciar sesión</button>
+      <button class="auth-tab"        id="tab-registro" onclick="cambiarTab('registro')">Crear cuenta</button>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="form-login">
+      <div class="auth-field">
+        <label>Correo institucional</label>
+        <input type="email" id="login-email" placeholder="tucorreo@anid.cl">
+      </div>
+      <div class="auth-field">
+        <label>Contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="login-pass" placeholder="Tu contraseña"
+            onkeydown="if(event.key==='Enter')iniciarSesion()">
+          <button class="toggle-pass" onclick="togglePass('login-pass',this)" type="button">👁</button>
+        </div>
+      </div>
+      <button class="btn-auth" id="btn-login" onclick="iniciarSesion()">Ingresar</button>
+    </div>
+
+    <!-- REGISTRO -->
+    <div id="form-registro" style="display:none">
+      <div class="auth-field">
+        <label>Correo institucional</label>
+        <input type="email" id="reg-email" placeholder="tucorreo@anid.cl">
+      </div>
+      <div class="auth-field">
+        <label>Contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="reg-pass" placeholder="Crea tu contraseña" oninput="checkReqs()">
+          <button class="toggle-pass" onclick="togglePass('reg-pass',this)" type="button">👁</button>
+        </div>
+      </div>
+      <div class="pass-req">
+        <p>La contraseña debe tener:</p>
+        <ul>
+          <li id="req-len">Mínimo 8 caracteres</li>
+          <li id="req-may">Una letra mayúscula</li>
+          <li id="req-num">Un número</li>
+        </ul>
+      </div>
+      <div class="auth-field">
+        <label>Confirmar contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="reg-pass2" placeholder="Repite tu contraseña"
+            onkeydown="if(event.key==='Enter')registrarse()">
+          <button class="toggle-pass" onclick="togglePass('reg-pass2',this)" type="button">👁</button>
+        </div>
+      </div>
+      <button class="btn-auth" id="btn-registro" onclick="registrarse()">Crear cuenta e ingresar</button>
+    </div>
+
+    <div id="msg-auth"></div>
+    <div class="hint">🔒 Solo cuentas @anid.cl tienen acceso</div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="pantalla-app">
 <div class="container">
 
   <div class="header">
-
     <div class="header-left">
-
-      <div class="logo">
-        📋
-      </div>
-
+      <div class="logo">📋</div>
       <div>
         <h1>Consulta Expedientes ANID</h1>
         <p>Sistema interno de consulta de pagos</p>
       </div>
-
     </div>
-
-    <div class="estado-top">
-      Plataforma Operativa
+    <div class="header-right">
+      <div class="usuario-badge" id="badge-usuario">👤</div>
+      <button class="btn-salir" onclick="cerrarSesion()">Cerrar sesión</button>
     </div>
-
   </div>
 
   <div class="buscador">
-
     <h2>Buscar Expediente</h2>
-
-    <p>
-      Ingresa el número TED exacto
-    </p>
-
+    <p>Ingresa el número TED exacto</p>
     <div class="search-row">
-
-      <input
-        type="text"
-        id="ted"
-        placeholder="Ejemplo: E648/2026"
-      >
-
-      <button onclick="buscarExpediente()">
-        Buscar
-      </button>
-
+      <input type="text" id="ted" placeholder="Ejemplo: E648/2026">
+      <button onclick="buscarExpediente()">Buscar</button>
     </div>
-
-    <div id="estado"></div>
-
   </div>
 
   <div id="resultado"></div>
 
   <div class="footer">
-    Plataforma Interna ANID
-    <br>
-    <span>
-      Creado por Marco Espinosa
-    </span>
+    Plataforma Interna ANID<br>
+    <span>Creado por Marco Espinosa</span>
   </div>
 
 </div>
+</div>
 
 <script>
-
 const SUPABASE_URL = 'https://elwugzjpfpxjyoyeeoaf.supabase.co';
-
 const SUPABASE_KEY = 'sb_publishable_imAQfXVuTQYav4-KM5R1rg_1eJnm8t5';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const clienteSupabase = supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
+const DOMINIO = '@anid.cl';
 
-window.onload = async () => {
-
-  const estado = document.getElementById('estado');
-
-  try {
-
-    const { data, error } = await clienteSupabase
-      .from('expedientes')
-      .select('*')
-      .limit(1);
-
-    if(error){
-
-      console.error(error);
-
-      estado.innerHTML = `
-        <div class="error">
-          ❌ Error conectando con Supabase
-        </div>
-      `;
-
-      return;
-
-    }
-
-    estado.innerHTML = `
-      <div class="ok">
-        ✅ Conectado correctamente a Supabase
-      </div>
-    `;
-
-  } catch(err){
-
-    console.error(err);
-
-    estado.innerHTML = `
-      <div class="error">
-        ❌ Error general
-      </div>
-    `;
-
-  }
-
+const SP_SITE   = 'https://portalconicyt.sharepoint.com/sites/DepartamentodeFinanzas';
+const SP_ROOT   = '/sites/DepartamentodeFinanzas/Respaldo Comprobantes';
+const SP_VIEWID = '7286966f-08f7-4101-9d8e-608daa07ac8d';
+const MESES = {
+  '01':'01. Enero','02':'02. Febrero','03':'03. Marzo','04':'04. Abril',
+  '05':'05. Mayo','06':'06. Junio','07':'07. Julio','08':'08. Agosto',
+  '09':'09. Septiembre','10':'10. Octubre','11':'11. Noviembre','12':'12. Diciembre'
 };
 
+// ── Sesión ───────────────────────────────────────────────────
+window.onload = async () => {
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) mostrarApp(session.user.email);
+};
+
+sb.auth.onAuthStateChange((event, session) => {
+  if(event === 'SIGNED_IN'  && session) mostrarApp(session.user.email);
+  if(event === 'SIGNED_OUT')            mostrarAuth();
+});
+
+function mostrarApp(email){
+  document.getElementById('pantalla-auth').style.display = 'none';
+  document.getElementById('pantalla-app').style.display  = 'block';
+  document.getElementById('badge-usuario').textContent   = '👤 ' + email;
+}
+function mostrarAuth(){
+  document.getElementById('pantalla-auth').style.display = 'block';
+  document.getElementById('pantalla-app').style.display  = 'none';
+  document.getElementById('msg-auth').innerHTML = '';
+}
+async function cerrarSesion(){ await sb.auth.signOut(); }
+
+// ── UI ───────────────────────────────────────────────────────
+function cambiarTab(tab){
+  document.getElementById('form-login').style.display    = tab==='login'    ? 'block':'none';
+  document.getElementById('form-registro').style.display = tab==='registro' ? 'block':'none';
+  document.getElementById('tab-login').className    = 'auth-tab'+(tab==='login'    ?' activo':'');
+  document.getElementById('tab-registro').className = 'auth-tab'+(tab==='registro' ?' activo':'');
+  document.getElementById('msg-auth').innerHTML = '';
+}
+
+function togglePass(id, btn){
+  const inp = document.getElementById(id);
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? '👁' : '🙈';
+}
+
+function setMsg(html, tipo){
+  document.getElementById('msg-auth').innerHTML =
+    '<div class="msg msg-'+tipo+'">'+html+'</div>';
+}
+
+function checkReqs(){
+  const p = document.getElementById('reg-pass').value;
+  const set = (id, ok) => {
+    document.getElementById(id).className = ok ? 'ok' : '';
+  };
+  set('req-len', p.length >= 8);
+  set('req-may', /[A-Z]/.test(p));
+  set('req-num', /[0-9]/.test(p));
+}
+
+// ── Login ────────────────────────────────────────────────────
+async function iniciarSesion(){
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('login-pass').value;
+  const btn   = document.getElementById('btn-login');
+
+  if(!email||!pass){ setMsg('Completa todos los campos.','err'); return; }
+  if(!email.endsWith(DOMINIO)){ setMsg('Solo se permiten correos '+DOMINIO,'err'); return; }
+
+  btn.disabled=true; btn.textContent='Ingresando...';
+  const { error } = await sb.auth.signInWithPassword({ email, password:pass });
+  btn.disabled=false; btn.textContent='Ingresar';
+
+  if(error){
+    const msg = error.message.includes('Invalid login')
+      ? 'Correo o contraseña incorrectos.'
+      : error.message;
+    setMsg('❌ '+msg,'err');
+  }
+}
+
+// ── Registro ─────────────────────────────────────────────────
+async function registrarse(){
+  const email = document.getElementById('reg-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const btn   = document.getElementById('btn-registro');
+
+  if(!email||!pass||!pass2){ setMsg('Completa todos los campos.','err'); return; }
+  if(!email.endsWith(DOMINIO)){ setMsg('Solo se permiten correos '+DOMINIO,'err'); return; }
+  if(pass.length<8||!/[A-Z]/.test(pass)||!/[0-9]/.test(pass)){
+    setMsg('La contraseña no cumple los requisitos mínimos.','err'); return;
+  }
+  if(pass!==pass2){ setMsg('Las contraseñas no coinciden.','err'); return; }
+
+  btn.disabled=true; btn.textContent='Creando cuenta...';
+  const { error } = await sb.auth.signUp({ email, password:pass });
+  btn.disabled=false; btn.textContent='Crear cuenta e ingresar';
+
+  if(error){
+    const msg = error.message.includes('already registered')
+      ? 'Este correo ya tiene una cuenta. Inicia sesión.'
+      : error.message;
+    setMsg('❌ '+msg,'err');
+  }
+  // Si no hay error, onAuthStateChange maneja el ingreso automático
+}
+
+// ── SharePoint ───────────────────────────────────────────────
+function urlComprobante(numeroCE, fechaPago){
+  let mes=null, anio=null;
+  if(fechaPago){
+    const f = String(fechaPago).trim();
+    let m = f.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m){ anio=m[1]; mes=m[2]; }
+    if(!mes){ m=f.match(/^(\d{2})[\/\.](\d{2})[\/\.](\d{4})/); if(m){ anio=m[3]; mes=m[2]; } }
+  }
+  if(!mes||!anio) return null;
+  const carpetaMes  = MESES[mes]||(mes+'. Mes');
+  const carpetaPath = SP_ROOT+'/'+anio+'/'+carpetaMes+'/Egresos';
+  const url = SP_SITE+'/Respaldo%20Comprobantes/Forms/AllItems.aspx'+
+    '?id='+encodeURIComponent(carpetaPath)+
+    '&viewid='+SP_VIEWID+
+    '&q=CE'+encodeURIComponent(String(numeroCE).trim());
+  return { url, carpetaMes, anio, numeroCE };
+}
+
+// ── Buscador ─────────────────────────────────────────────────
 async function buscarExpediente(){
-
-  const ted = document
-    .getElementById('ted')
-    .value
-    .trim();
-
+  const ted = document.getElementById('ted').value.trim();
   const resultado = document.getElementById('resultado');
-
   resultado.innerHTML = '';
 
-  if(!ted){
+  if(!ted){ alert('Ingresa un TED'); return; }
 
-    alert('Ingresa un TED');
-
-    return;
-
-  }
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ mostrarAuth(); return; }
 
   try {
-
-    const { data, error } = await clienteSupabase
-      .from('expedientes')
-      .select('*')
-      .eq('numero_ted', ted);
+    const { data, error } = await sb.from('expedientes').select('*').eq('numero_ted', ted);
 
     if(error){
-
-      console.error(error);
-
-      resultado.innerHTML = `
-        <div class="seccion">
-
-          <h2>Error</h2>
-
-          <p>
-            Error consultando Supabase
-          </p>
-
-        </div>
-      `;
-
+      resultado.innerHTML='<div class="seccion"><h2>Error</h2><p>Error consultando la base de datos</p></div>';
       return;
-
     }
-
-    if(!data || data.length === 0){
-
-      resultado.innerHTML = `
-        <div class="seccion">
-
-          <h2>Sin resultados</h2>
-
-          <p>
-            No existe el expediente:
-            <strong>${ted}</strong>
-          </p>
-
-        </div>
-      `;
-
+    if(!data||data.length===0){
+      resultado.innerHTML='<div class="seccion"><h2>Sin resultados</h2><p>No existe el expediente: <strong>'+ted+'</strong></p></div>';
       return;
-
     }
 
     const d = data[0];
-
-    const tienNomina = d.numero_nomina !== null && d.numero_nomina !== undefined && String(d.numero_nomina).trim() !== '';
-    const tienFechaPago = d.fecha_pago !== null && d.fecha_pago !== undefined && String(d.fecha_pago).trim() !== '';
-    const tramitado = tienNomina && tienFechaPago;
+    const tienNomina    = d.numero_nomina      !=null && String(d.numero_nomina).trim()     !=='';
+    const tienFechaPago = d.fecha_pago         !=null && String(d.fecha_pago).trim()        !=='';
+    const tienCE        = d.comprobante_egreso !=null && String(d.comprobante_egreso).trim()!=='';
+    const tramitado     = tienNomina && tienFechaPago;
 
     const badgeHTML = tramitado
-      ? `<div class="estado-expediente estado-tramitado">
-           <div class="icono">✅</div>
-           <div class="texto-estado">
-             <span>TRAMITADO</span>
-             <small>Nómina y fecha de pago registradas</small>
-           </div>
-         </div>`
-      : `<div class="estado-expediente estado-en-proceso">
-           <div class="icono">⏳</div>
-           <div class="texto-estado">
-             <span>EN PROCESO DE TRAMITACIÓN</span>
-             <small>Pendiente de nómina o fecha de pago</small>
-           </div>
-         </div>`;
+      ? '<div class="estado-expediente estado-tramitado"><div class="icono">✅</div><div class="texto-estado"><span>TRAMITADO</span><small>Nómina y fecha de pago registradas</small></div></div>'
+      : '<div class="estado-expediente estado-en-proceso"><div class="icono">⏳</div><div class="texto-estado"><span>EN PROCESO DE TRAMITACIÓN</span><small>Pendiente de nómina o fecha de pago</small></div></div>';
 
-    let html = `
-
-      <div class="seccion">
-
-        <h2>
-          📄 Expediente Encontrado
-        </h2>
-
-        ${badgeHTML}
-
-        <div class="grid">
-
-    `;
-
-    for(const campo in d){
-
-      html += `
-
-        <div class="campo">
-
-          <div class="label">
-            ${campo}
-          </div>
-
-          <div class="valor">
-            ${d[campo] ?? '-'}
-          </div>
-
-        </div>
-
-      `;
-
+    let btnCE = '';
+    if(tienCE){
+      const ce = urlComprobante(d.comprobante_egreso, d.fecha_pago);
+      if(ce){
+        btnCE='<div class="btn-ce-wrap"><a class="btn-ce" href="'+ce.url+'" target="_blank" rel="noopener noreferrer">'+
+          '<span class="pdf-icon">📄</span>Ver Comprobante de Egreso — CE'+ce.numeroCE+
+          '<span class="carpeta-hint">→ '+ce.carpetaMes+' '+ce.anio+'</span></a></div>';
+      } else {
+        btnCE='<div class="btn-ce-wrap"><div class="btn-ce-aviso">⚠️ CE'+d.comprobante_egreso+' sin fecha de pago para determinar carpeta</div></div>';
+      }
+    } else {
+      btnCE='<div class="btn-ce-wrap"><div class="btn-ce-aviso">📎 Comprobante de egreso aún no registrado</div></div>';
     }
 
-    html += `
-
-        </div>
-
-      </div>
-
-    `;
-
-    resultado.innerHTML = html;
+    let html='<div class="seccion"><h2>📄 Expediente Encontrado</h2>'+badgeHTML+btnCE+'<div class="grid">';
+    for(const campo in d){
+      html+='<div class="campo"><div class="label">'+campo+'</div><div class="valor">'+(d[campo]??'-')+'</div></div>';
+    }
+    html+='</div></div>';
+    resultado.innerHTML=html;
 
   } catch(err){
-
     console.error(err);
-
-    resultado.innerHTML = `
-      <div class="seccion">
-
-        <h2>Error General</h2>
-
-        <p>
-          Ocurrió un problema consultando el expediente
-        </p>
-
-      </div>
-    `;
-
+    resultado.innerHTML='<div class="seccion"><h2>Error General</h2><p>Ocurrió un problema consultando el expediente</p></div>';
   }
-
 }
-
 </script>
-
 </body>
 </html>
