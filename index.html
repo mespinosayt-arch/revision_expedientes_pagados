@@ -309,12 +309,11 @@ const MESES = {
 // ── Sesión ───────────────────────────────────────────────────
 window.onload = async () => {
 
-  // Detectar si venimos de un enlace de recuperación de contraseña
-  // Supabase incluye #access_token=...&type=recovery en la URL
+  // Si venimos de enlace de recuperación, no mostrar app todavía
+  // onAuthStateChange disparará PASSWORD_RECOVERY o SIGNED_IN con hash recovery
   const hash = window.location.hash;
   if(hash.includes('type=recovery')){
-    // Dejar que onAuthStateChange maneje el evento PASSWORD_RECOVERY
-    return;
+    return; // esperar el evento de onAuthStateChange
   }
 
   const { data:{ session } } = await sb.auth.getSession();
@@ -323,12 +322,20 @@ window.onload = async () => {
 
 sb.auth.onAuthStateChange((event, session) => {
   if(event === 'PASSWORD_RECOVERY'){
-    // Usuario llegó desde el enlace de recuperación — mostrar form nueva clave
     mostrarFormNuevaClave();
     return;
   }
-  if(event === 'SIGNED_IN'  && session) mostrarApp(session.user.email);
-  if(event === 'SIGNED_OUT')            mostrarAuth();
+  if(event === 'SIGNED_IN' && session){
+    // Si venimos de un enlace de recuperación, mostrar form nueva clave
+    // en vez de entrar a la app directamente
+    const hash = window.location.hash;
+    if(hash.includes('type=recovery')){
+      mostrarFormNuevaClave();
+      return;
+    }
+    mostrarApp(session.user.email);
+  }
+  if(event === 'SIGNED_OUT') mostrarAuth();
 });
 
 function mostrarFormNuevaClave(){
