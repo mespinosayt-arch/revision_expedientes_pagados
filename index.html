@@ -72,6 +72,10 @@ body{
 .msg-err{ background:#fef2f2; color:#991b1b; border-left:4px solid var(--rojo); }
 
 .hint{ margin-top:14px; font-size:12px; color:#94a3b8; }
+.link-olvido{ display:block; margin-top:10px; font-size:13px; color:var(--azul); cursor:pointer; text-decoration:underline; background:none; border:none; width:100%; text-align:right; }
+.link-olvido:hover{ color:var(--azul2); }
+.btn-volver{ background:none; border:none; color:#64748b; font-size:13px; cursor:pointer; margin-top:12px; text-decoration:underline; }
+.btn-volver:hover{ color:var(--azul); }
 
 .pass-req{
   background:#f8fafc; border-radius:8px; padding:10px 14px; margin-bottom:14px; text-align:left;
@@ -198,6 +202,7 @@ body{
         </div>
       </div>
       <button class="btn-auth" id="btn-login" onclick="iniciarSesion()">Ingresar</button>
+      <button class="link-olvido" onclick="cambiarTab('recuperar')">¿Olvidaste tu contraseña?</button>
     </div>
 
     <!-- REGISTRO -->
@@ -230,6 +235,17 @@ body{
         </div>
       </div>
       <button class="btn-auth" id="btn-registro" onclick="registrarse()">Crear cuenta e ingresar</button>
+    </div>
+
+    <!-- RECUPERAR -->
+    <div id="form-recuperar" style="display:none">
+      <p style="color:#64748b;font-size:14px;text-align:left;margin-bottom:16px;">Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.</p>
+      <div class="auth-field">
+        <label>Correo institucional</label>
+        <input type="email" id="rec-email" placeholder="tucorreo@anid.cl">
+      </div>
+      <button class="btn-auth" id="btn-recuperar" onclick="recuperarPassword()">Enviar enlace</button>
+      <button class="btn-volver" onclick="cambiarTab('login')">← Volver al inicio de sesión</button>
     </div>
 
     <div id="msg-auth"></div>
@@ -292,14 +308,105 @@ const MESES = {
 
 // ── Sesión ───────────────────────────────────────────────────
 window.onload = async () => {
+
+  // Detectar si venimos de un enlace de recuperación de contraseña
+  // Supabase incluye #access_token=...&type=recovery en la URL
+  const hash = window.location.hash;
+  if(hash.includes('type=recovery')){
+    // Dejar que onAuthStateChange maneje el evento PASSWORD_RECOVERY
+    return;
+  }
+
   const { data:{ session } } = await sb.auth.getSession();
   if(session) mostrarApp(session.user.email);
 };
 
 sb.auth.onAuthStateChange((event, session) => {
+  if(event === 'PASSWORD_RECOVERY'){
+    // Usuario llegó desde el enlace de recuperación — mostrar form nueva clave
+    mostrarFormNuevaClave();
+    return;
+  }
   if(event === 'SIGNED_IN'  && session) mostrarApp(session.user.email);
   if(event === 'SIGNED_OUT')            mostrarAuth();
 });
+
+function mostrarFormNuevaClave(){
+  document.getElementById('pantalla-auth').style.display = 'block';
+  document.getElementById('pantalla-app').style.display  = 'none';
+  document.querySelector('.auth-tabs').style.display     = 'none';
+  document.getElementById('form-login').style.display    = 'none';
+  document.getElementById('form-registro').style.display = 'none';
+  document.getElementById('form-recuperar').style.display= 'none';
+
+  // Insertar form nueva clave dinámicamente si no existe
+  if(!document.getElementById('form-nueva-clave')){
+    const div = document.createElement('div');
+    div.id = 'form-nueva-clave';
+    div.innerHTML = `
+      <p style="color:#64748b;font-size:14px;text-align:left;margin-bottom:16px;">Crea tu nueva contraseña.</p>
+      <div class="auth-field">
+        <label>Nueva contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="nueva-pass" placeholder="Mínimo 8 caracteres" oninput="checkReqsNueva()">
+          <button class="toggle-pass" onclick="togglePass('nueva-pass',this)" type="button">👁</button>
+        </div>
+      </div>
+      <div class="pass-req">
+        <p>La contraseña debe tener:</p>
+        <ul>
+          <li id="nreq-len">Mínimo 8 caracteres</li>
+          <li id="nreq-may">Una letra mayúscula</li>
+          <li id="nreq-num">Un número</li>
+        </ul>
+      </div>
+      <div class="auth-field">
+        <label>Confirmar contraseña</label>
+        <div class="pass-wrap">
+          <input type="password" id="nueva-pass2" placeholder="Repite tu contraseña">
+          <button class="toggle-pass" onclick="togglePass('nueva-pass2',this)" type="button">👁</button>
+        </div>
+      </div>
+      <button class="btn-auth" id="btn-nueva-clave" onclick="guardarNuevaClave()">Guardar nueva contraseña</button>
+    `;
+    const msgDiv = document.getElementById('msg-auth');
+    msgDiv.parentNode.insertBefore(div, msgDiv);
+  }
+  document.getElementById('form-nueva-clave').style.display = 'block';
+  document.getElementById('msg-auth').innerHTML = '';
+}
+
+function checkReqsNueva(){
+  const p = document.getElementById('nueva-pass').value;
+  const set = (id,ok) => { document.getElementById(id).className = ok?'ok':''; };
+  set('nreq-len', p.length>=8);
+  set('nreq-may', /[A-Z]/.test(p));
+  set('nreq-num', /[0-9]/.test(p));
+}
+
+async function guardarNuevaClave(){
+  const pass  = document.getElementById('nueva-pass').value;
+  const pass2 = document.getElementById('nueva-pass2').value;
+  const btn   = document.getElementById('btn-nueva-clave');
+
+  if(!pass||!pass2){ setMsg('Completa ambos campos.','err'); return; }
+  if(pass.length<8||!/[A-Z]/.test(pass)||!/[0-9]/.test(pass)){
+    setMsg('La contraseña no cumple los requisitos.','err'); return;
+  }
+  if(pass!==pass2){ setMsg('Las contraseñas no coinciden.','err'); return; }
+
+  btn.disabled=true; btn.textContent='Guardando...';
+  const { error } = await sb.auth.updateUser({ password: pass });
+  btn.disabled=false; btn.textContent='Guardar nueva contraseña';
+
+  if(error){ setMsg('❌ '+error.message,'err'); return; }
+
+  setMsg('✅ ¡Contraseña actualizada! Ingresando...','ok');
+  setTimeout(async()=>{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session) mostrarApp(session.user.email);
+  }, 1500);
+}
 
 function mostrarApp(email){
   document.getElementById('pantalla-auth').style.display = 'none';
@@ -317,9 +424,33 @@ async function cerrarSesion(){ await sb.auth.signOut(); }
 function cambiarTab(tab){
   document.getElementById('form-login').style.display    = tab==='login'    ? 'block':'none';
   document.getElementById('form-registro').style.display = tab==='registro' ? 'block':'none';
+  document.getElementById('form-recuperar').style.display= tab==='recuperar'? 'block':'none';
   document.getElementById('tab-login').className    = 'auth-tab'+(tab==='login'    ?' activo':'');
   document.getElementById('tab-registro').className = 'auth-tab'+(tab==='registro' ?' activo':'');
+  // Ocultar tabs cuando se muestra recuperar
+  document.querySelector('.auth-tabs').style.display = tab==='recuperar' ? 'none':'flex';
   document.getElementById('msg-auth').innerHTML = '';
+}
+
+async function recuperarPassword(){
+  const email = document.getElementById('rec-email').value.trim().toLowerCase();
+  const btn   = document.getElementById('btn-recuperar');
+
+  if(!email){ setMsg('Ingresa tu correo institucional.','err'); return; }
+  if(!email.endsWith(DOMINIO)){ setMsg('Solo se permiten correos '+DOMINIO,'err'); return; }
+
+  btn.disabled=true; btn.textContent='Enviando...';
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: 'https://mespinosayt-arch.github.io/revision_expedientes_pagados/'
+  });
+
+  btn.disabled=false; btn.textContent='Enviar enlace';
+
+  if(error){
+    setMsg('❌ '+error.message,'err'); return;
+  }
+  setMsg('✅ Enlace enviado a <strong>'+email+'</strong>. Revisa tu bandeja de entrada y haz clic en el enlace para crear tu nueva contraseña.','ok');
 }
 
 function togglePass(id, btn){
