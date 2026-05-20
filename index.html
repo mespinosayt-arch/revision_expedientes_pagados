@@ -89,14 +89,28 @@ body{
 
 /* ══ BUSCADOR ══ */
 .buscador{ background:white; border-radius:18px; padding:25px; margin-bottom:20px; box-shadow:0 10px 30px rgba(0,0,0,0.15); }
-.buscador h2{ color:var(--azul); margin-bottom:8px; }
-.buscador p{ color:#666; margin-bottom:20px; font-size:14px; }
+.buscador h2{ color:var(--azul); margin-bottom:16px; }
+.search-tabs{ display:flex; gap:4px; background:#f1f5f9; border-radius:12px; padding:4px; margin-bottom:20px; }
+.search-tab{ flex:1; padding:10px; border:none; border-radius:9px; font-size:14px; font-weight:bold; cursor:pointer; background:transparent; color:#64748b; transition:0.2s; }
+.search-tab.activo{ background:white; color:var(--azul); box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+.search-tab:hover:not(.activo){ background:rgba(255,255,255,0.6); }
 .search-row{ display:flex; gap:12px; }
 .search-row input{ flex:1; padding:16px; border:2px solid var(--borde); border-radius:10px; font-size:16px; transition:0.2s; }
 .search-row input:focus{ outline:none; border-color:var(--azul); box-shadow:0 0 0 4px rgba(0,51,160,0.1); }
 .search-row button{ background:var(--azul); color:white; border:none; border-radius:10px; padding:16px 28px; font-size:15px; font-weight:bold; cursor:pointer; transition:0.2s; }
 .search-row button:hover{ background:var(--azul2); transform:translateY(-1px); }
 #resultado{ margin-top:20px; }
+/* Devengo results */
+.devengo-tabla{ width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+.devengo-tabla th{ background:var(--azul); color:white; padding:10px 12px; text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; }
+.devengo-tabla th:first-child{ border-radius:8px 0 0 0; }
+.devengo-tabla th:last-child{ border-radius:0 8px 0 0; }
+.devengo-tabla td{ padding:10px 12px; border-bottom:1px solid var(--gris); color:#374151; }
+.devengo-tabla tr:hover td{ background:#f8fafc; }
+.devengo-tabla tr:last-child td{ border-bottom:none; }
+.devengo-count{ font-size:13px; color:#64748b; margin-bottom:12px; }
+.ted-link{ color:var(--azul); font-weight:bold; cursor:pointer; text-decoration:underline; }
+.ted-link:hover{ color:var(--azul2); }
 
 /* ══ RESULTADOS ══ */
 .seccion{ background:white; border-radius:18px; padding:25px; margin-bottom:20px; box-shadow:0 10px 30px rgba(0,0,0,0.15); }
@@ -236,10 +250,15 @@ body{
 
   <div class="buscador">
     <h2>Buscar Expediente</h2>
-    <p>Ingresa el número TED exacto</p>
+    <div class="search-tabs">
+      <button class="search-tab activo" onclick="cambiarPestana('ted',this)">🔍 Por TED</button>
+      <button class="search-tab" onclick="cambiarPestana('rut',this)">👤 Por RUT</button>
+      <button class="search-tab" onclick="cambiarPestana('folio',this)">📄 Por Folio</button>
+    </div>
+    <div id="hint-busqueda" style="color:#666;font-size:14px;margin-bottom:16px;">Ingresa el número TED exacto</div>
     <div class="search-row">
-      <input type="text" id="ted" placeholder="Ejemplo: E648/2026" onkeydown="if(event.key==='Enter')buscarExpediente()">
-      <button onclick="buscarExpediente()">Buscar</button>
+      <input type="text" id="input-busqueda" placeholder="Ejemplo: E648/2026" onkeydown="if(event.key==='Enter')ejecutarBusqueda()">
+      <button onclick="ejecutarBusqueda()">Buscar</button>
     </div>
   </div>
 
@@ -608,9 +627,161 @@ function urlComprobante(numeroCE, fechaPago){
   return{url,carpetaMes,anio,numeroCE};
 }
 
-// ── Buscador ─────────────────────────────────────────────────
+// ── Pestañas ─────────────────────────────────────────────────
+let pestanaActiva = 'ted';
+function cambiarPestana(tipo, btn){
+  pestanaActiva = tipo;
+  document.querySelectorAll('.search-tab').forEach(b=>b.classList.remove('activo'));
+  btn.classList.add('activo');
+  const hints = {ted:'Ingresa el número TED exacto', rut:'Ingresa el RUT (ej: 12345678-9)', folio:'Ingresa el número de folio'};
+  const placeholders = {ted:'Ejemplo: E648/2026', rut:'Ejemplo: 12345678-9', folio:'Ejemplo: 123456'};
+  document.getElementById('hint-busqueda').textContent = hints[tipo];
+  document.getElementById('input-busqueda').placeholder = placeholders[tipo];
+  document.getElementById('resultado').innerHTML = '';
+  document.getElementById('input-busqueda').value = '';
+  document.getElementById('input-busqueda').focus();
+}
+
+function ejecutarBusqueda(){
+  if(pestanaActiva==='ted') buscarExpediente();
+  else if(pestanaActiva==='rut') buscarPorRutOFolio('rut');
+  else buscarPorRutOFolio('folio');
+}
+
+// ── Buscar por RUT o Folio ────────────────────────────────────
+async function buscarPorRutOFolio(tipo){
+  const val = document.getElementById('input-busqueda').value.trim();
+  const resultado = document.getElementById('resultado');
+  resultado.innerHTML = '';
+  if(!val){alert('Ingresa un '+(tipo==='rut'?'RUT':'folio'));return;}
+
+  const{data:{session}}=await sb.auth.getSession();
+  if(!session){mostrarAuth();return;}
+
+  resultado.innerHTML = '<div class="seccion"><p style="color:#64748b">Buscando...</p></div>';
+
+  try{
+    let devRes;
+    if(tipo==='rut'){
+      devRes = await sb.from('devengo').select('*').ilike('rut', val);
+    } else {
+      // proyecto viene como "21230485.0" en Supabase, buscamos con wildcard
+      devRes = await sb.from('devengo').select('*').ilike('proyecto', val + '%');
+    }
+
+    if(devRes.error){
+      resultado.innerHTML='<div class="seccion"><h2>Error</h2><p>Error consultando la base de datos</p></div>';
+      return;
+    }
+    if(!devRes.data||devRes.data.length===0){
+      resultado.innerHTML='<div class="seccion"><h2>Sin resultados</h2><p>No se encontraron registros para: <strong>'+val+'</strong></p></div>';
+      return;
+    }
+
+    const filas = devRes.data;
+    const fmtM = (v) => (v!=null && parseFloat(v)!==0) ? '$'+Math.round(parseFloat(v)).toLocaleString('es-CL') : '-';
+    const fmtF = (v) => {
+      if(!v) return '-';
+      const s = String(v).trim();
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return iso ? iso[3]+'-'+iso[2]+'-'+iso[1] : s;
+    };
+    const fmt = (v) => (v!=null && String(v).trim()!=='' && String(v).trim()!=='null') ? v : '-';
+
+    let tabla = '<div class="seccion">';
+    tabla += '<h2>'+(tipo==='rut'?'👤 Resultados por RUT':'📄 Resultados por Folio')+': '+val+'</h2>';
+    tabla += '<div class="devengo-count">'+filas.length+' registro'+(filas.length!==1?'s':'')+' encontrado'+(filas.length!==1?'s':'')+'</div>';
+    tabla += '<div style="overflow-x:auto"><table class="devengo-tabla">';
+    tabla += '<tr><th>N° Dev.</th><th>Proyecto</th><th>N° Ref. (TED)</th><th>RUT</th><th>Monto Inicial</th><th>Pagos</th><th>Emisión</th><th>Vencimiento</th></tr>';
+
+    // Recopilar TEDs únicos desde devengo
+    const tedsUnicos = [...new Set(filas.map(r=>fmt(r.nro_ref)).filter(t=>t!=='-'))];
+
+    // Buscar info de pago en expedientes — cada TED en devengo es "E934", en expedientes es "E934/2026"
+    // Usamos ilike con % para hacer el cruce
+    let expMap = {};
+    for(const tedBase of tedsUnicos){
+      const expRes2 = await sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%');
+      if(expRes2.data && expRes2.data.length > 0){
+        expMap[tedBase] = expRes2.data[0];
+      }
+    }
+
+    tabla += '</table></div>';
+
+    // Mostrar detalle de pago por cada TED encontrado
+    if(tedsUnicos.length > 0){
+      tabla += '<div style="margin-top:24px">';
+      tabla += '<div class="grupo-titulo">💰 Información de Pago por Expediente</div>';
+
+      tedsUnicos.forEach(tedNum => {
+        const exp = expMap[tedNum] || null;
+        const fmtV = (v) => (v!=null && String(v).trim()!=='' && String(v).trim()!=='-') ? String(v) : null;
+        const fmtFexp = (v) => {
+          if(!v) return 'Sin datos';
+          const s = String(v).trim();
+          const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+          return iso ? iso[3]+'-'+iso[2]+'-'+iso[1] : s;
+        };
+        const fmtMexp = (v) => {
+          if(v==null || String(v).trim()==='') return 'Sin datos';
+          const n = parseFloat(v);
+          return isNaN(n) ? String(v) : '$'+Math.round(n).toLocaleString('es-CL');
+        };
+
+        tabla += '<div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--azul)">';
+        tabla += '<div style="font-size:13px;font-weight:800;color:var(--azul);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px">📋 TED: '+tedNum+'</div>';
+
+        if(exp){
+          const tramitado = fmtV(exp.numero_nomina) && fmtV(exp.fecha_pago);
+          const badge = tramitado
+            ? '<span style="background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold">✅ TRAMITADO</span>'
+            : '<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold">⏳ EN PROCESO</span>';
+          tabla += '<div style="margin-bottom:12px">'+badge+'</div>';
+          tabla += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">';
+          const miniCampo = (label, val) =>
+            '<div style="background:white;border-radius:8px;padding:10px 12px;border-left:3px solid #dbe3ee">' +
+            '<div style="font-size:10px;text-transform:uppercase;color:#94a3b8;font-weight:700;margin-bottom:4px">'+label+'</div>' +
+            '<div style="font-size:14px;color:#111827;font-weight:500">'+(val||'<span style="color:#cbd5e1;font-style:italic">Sin datos</span>')+'</div></div>';
+          tabla += miniCampo('Fecha Ingreso', fmtFexp(exp.fecha_ingreso));
+          tabla += miniCampo('Tipo Pago', fmtV(exp.tipo_pago));
+          tabla += miniCampo('Monto Total', fmtMexp(exp.monto_total));
+          tabla += miniCampo('Moneda', fmtV(exp.moneda));
+          tabla += miniCampo('Fecha Pago', fmtFexp(exp.fecha_pago));
+          tabla += miniCampo('N° Nómina', fmtV(exp.numero_nomina));
+          tabla += miniCampo('Fecha Nómina', fmtFexp(exp.fecha_nomina));
+          tabla += miniCampo('Analista', fmtV(exp.analista));
+          tabla += miniCampo('PP', fmtV(exp.pp));
+          tabla += miniCampo('Cuenta Corriente', fmtV(exp.cuenta_corriente));
+          tabla += miniCampo('Centro Costo', fmtV(exp.centro_costo));
+          tabla += miniCampo('Comprobante Egreso', fmtV(exp.comprobante_egreso));
+          tabla += '</div>';
+        } else {
+          tabla += '<div style="color:#64748b;font-size:14px;font-style:italic">No se encontró información de pago para este TED en expedientes.</div>';
+        }
+        tabla += '</div>';
+      });
+      tabla += '</div>';
+    }
+
+    tabla += '</div>';
+    resultado.innerHTML = tabla;
+
+  } catch(err){
+    console.error(err);
+    resultado.innerHTML='<div class="seccion"><h2>Error General</h2><p>Ocurrió un problema en la búsqueda</p></div>';
+  }
+}
+
+function buscarTED(ted){
+  document.querySelectorAll('.search-tab')[0].click();
+  document.getElementById('input-busqueda').value = ted;
+  buscarExpediente();
+}
+
+// ── Buscador por TED ─────────────────────────────────────────────────
 async function buscarExpediente(){
-  const ted = document.getElementById('ted').value.trim();
+  const ted = document.getElementById('input-busqueda').value.trim();
   const resultado = document.getElementById('resultado');
   resultado.innerHTML = '';
   if(!ted){alert('Ingresa un TED');return;}
@@ -619,11 +790,8 @@ async function buscarExpediente(){
   if(!session){mostrarAuth();return;}
 
   try{
-    // Extraer la parte base del TED: "E648/2026" → "E648"
-    // Extraer parte base del TED en mayúsculas: "e6471/2026" → "E6471"
     const tedBase = (ted.includes('/') ? ted.split('/')[0].trim() : ted.trim()).toUpperCase();
 
-    // Consultar expediente y rechazos en paralelo
     const[expRes, recRes] = await Promise.all([
       sb.from('expedientes').select('*').ilike('numero_ted', ted),
       sb.from('rechazos').select('*').ilike('ted_pago', tedBase).order('fecha',{ascending:true})
