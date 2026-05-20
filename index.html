@@ -697,14 +697,16 @@ async function buscarPorRutOFolio(tipo){
     // Recopilar TEDs únicos desde devengo
     const tedsUnicos = [...new Set(filas.map(r=>fmt(r.nro_ref)).filter(t=>t!=='-'))];
 
-    // Buscar info de pago en expedientes — cada TED en devengo es "E934", en expedientes es "E934/2026"
-    // Usamos ilike con % para hacer el cruce
+    // Buscar info de pago en expedientes y rechazos para cada TED
     let expMap = {};
+    let recMap = {};
     for(const tedBase of tedsUnicos){
-      const expRes2 = await sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%');
-      if(expRes2.data && expRes2.data.length > 0){
-        expMap[tedBase] = expRes2.data[0];
-      }
+      const [expRes2, recRes2] = await Promise.all([
+        sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%'),
+        sb.from('rechazos').select('*').ilike('ted_pago', tedBase).order('fecha',{ascending:true})
+      ]);
+      if(expRes2.data && expRes2.data.length > 0) expMap[tedBase] = expRes2.data[0];
+      if(recRes2.data) recMap[tedBase] = recRes2.data;
     }
 
     tabla += '</table></div>';
@@ -738,6 +740,28 @@ async function buscarPorRutOFolio(tipo){
             ? '<span style="background:#ecfdf5;color:#065f46;border:1px solid #6ee7b7;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold">✅ TRAMITADO</span>'
             : '<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold">⏳ EN PROCESO</span>';
           tabla += '<div style="margin-bottom:12px">'+badge+'</div>';
+
+          // Rechazos bancarios
+          const rechazos = recMap[tedNum] || [];
+          if(rechazos.length === 0){
+            tabla += '<div style="display:flex;align-items:center;gap:8px;background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:bold;margin-bottom:12px;border-left:4px solid #10b981">✅ Sin rechazos bancarios</div>';
+          } else {
+            tabla += '<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444">';
+            tabla += '<div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios ('+rechazos.length+')</div>';
+            rechazos.forEach((r,idx)=>{
+              const fmtR = (v) => (v!=null && String(v).trim()!=='') ? String(v) : '-';
+              const fmtFR = (v) => { if(!v) return '-'; const s=String(v).trim(); const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return iso?iso[3]+'-'+iso[2]+'-'+iso[1]:s; };
+              tabla += '<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px">';
+              tabla += '<div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #'+(idx+1)+'</div>';
+              tabla += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px">';
+              tabla += '<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>'+fmtFR(r.fecha)+'</div>';
+              tabla += '<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>'+fmtR(r.rut)+'</div>';
+              tabla += '<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>'+fmtR(r.beneficiario)+'</div>';
+              tabla += '<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>'+fmtR(r.cuenta_corriente)+'</div>';
+              tabla += '</div></div>';
+            });
+            tabla += '</div>';
+          }
           tabla += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">';
           const miniCampo = (label, val) =>
             '<div style="background:white;border-radius:8px;padding:10px 12px;border-left:3px solid #dbe3ee">' +
