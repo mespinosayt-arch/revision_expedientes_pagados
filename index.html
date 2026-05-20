@@ -702,10 +702,15 @@ async function buscarPorRutOFolio(tipo){
     const rutsUnicos = [...new Set(filas.map(r=>fmt(r.rut)).filter(r=>r!=='-'))];
 
     // Buscar info de pago en expedientes para cada TED
+    // El devengo puede traer "E2354AC" → extraemos solo "E2354" para buscar en expedientes
     let expMap = {};
     for(const tedBase of tedsUnicos){
-      const expRes2 = await sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%');
-      if(expRes2.data && expRes2.data.length > 0) expMap[tedBase] = expRes2.data[0];
+      const tedLimpio = tedBase.replace(/[A-Za-z]+$/, ''); // quita letras del final: E2354AC → E2354
+      const expRes2 = await sb.from('expedientes').select('*').ilike('numero_ted', tedLimpio + '%');
+      if(expRes2.data && expRes2.data.length > 0){
+        // Si hay varios (E2354AC, E2354AD), guardar todos bajo la clave original
+        expMap[tedBase] = expRes2.data[0];
+      }
     }
 
     // Buscar rechazos directamente por RUT — solo el más reciente
