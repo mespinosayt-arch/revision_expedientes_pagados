@@ -694,19 +694,26 @@ async function buscarPorRutOFolio(tipo){
     tabla += '<div style="overflow-x:auto"><table class="devengo-tabla">';
     tabla += '<tr><th>N° Dev.</th><th>Proyecto</th><th>N° Ref. (TED)</th><th>RUT</th><th>Monto Inicial</th><th>Pagos</th><th>Emisión</th><th>Vencimiento</th></tr>';
 
+
     // Recopilar TEDs únicos desde devengo
     const tedsUnicos = [...new Set(filas.map(r=>fmt(r.nro_ref)).filter(t=>t!=='-'))];
 
-    // Buscar info de pago en expedientes y rechazos para cada TED
+    // Recopilar RUTs únicos desde devengo
+    const rutsUnicos = [...new Set(filas.map(r=>fmt(r.rut)).filter(r=>r!=='-'))];
+
+    // Buscar info de pago en expedientes para cada TED
     let expMap = {};
-    let recMap = {};
     for(const tedBase of tedsUnicos){
-      const [expRes2, recRes2] = await Promise.all([
-        sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%'),
-        sb.from('rechazos').select('*').ilike('ted_pago', tedBase).order('fecha',{ascending:true})
-      ]);
+      const expRes2 = await sb.from('expedientes').select('*').ilike('numero_ted', tedBase + '/%');
       if(expRes2.data && expRes2.data.length > 0) expMap[tedBase] = expRes2.data[0];
-      if(recRes2.data) recMap[tedBase] = recRes2.data;
+    }
+
+    // Buscar rechazos directamente por RUT — solo el más reciente
+    let recPorRut = {};
+    for(let i=0; i<rutsUnicos.length; i++){
+      const rut = rutsUnicos[i];
+      const recRes2 = await sb.from('rechazos').select('*').ilike('rut', rut).order('fecha',{ascending:false}).limit(1);
+      if(recRes2.data && recRes2.data.length > 0) recPorRut[rut] = recRes2.data[0];
     }
 
     tabla += '</table></div>';
