@@ -101,11 +101,16 @@ body{
 /* ══ RESULTADOS ══ */
 .seccion{ background:white; border-radius:18px; padding:25px; margin-bottom:20px; box-shadow:0 10px 30px rgba(0,0,0,0.15); }
 .seccion h2{ color:var(--azul); margin-bottom:20px; padding-bottom:12px; border-bottom:3px solid var(--gris); }
-.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
-.campo{ background:#f8fafc; border-radius:12px; padding:16px; border-left:4px solid var(--azul); transition:0.2s; }
+.grupo-titulo{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--azul); margin:24px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--gris); display:flex; align-items:center; gap:8px; }
+.grupo-titulo:first-child{ margin-top:0; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:4px; }
+.campo{ background:#f8fafc; border-radius:10px; padding:14px 16px; border-left:3px solid var(--azul); transition:0.2s; }
 .campo:hover{ transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.08); }
-.label{ font-size:11px; text-transform:uppercase; color:#64748b; margin-bottom:8px; font-weight:bold; letter-spacing:0.5px; }
-.valor{ font-size:15px; color:#111827; word-break:break-word; line-height:1.4; }
+.campo.destacado{ border-left-color:#10b981; background:#f0fdf4; }
+.campo.alerta{ border-left-color:#f59e0b; background:#fffbeb; }
+.label{ font-size:10px; text-transform:uppercase; color:#94a3b8; margin-bottom:6px; font-weight:700; letter-spacing:0.6px; }
+.valor{ font-size:15px; color:#111827; word-break:break-word; line-height:1.4; font-weight:500; }
+.valor.vacio{ color:#cbd5e1; font-style:italic; font-weight:400; }
 .estado-expediente{ display:flex; align-items:center; gap:14px; padding:18px 22px; border-radius:14px; margin-bottom:24px; font-size:17px; font-weight:bold; }
 .estado-expediente .icono{ font-size:28px; line-height:1; }
 .estado-expediente .texto-estado{ display:flex; flex-direction:column; gap:3px; }
@@ -697,11 +702,70 @@ async function buscarExpediente(){
     }
     rechazosHTML += '</div>';
 
-    // Campos expediente
-    let gridHTML = '<div class="grid">';
-    for(const campo in d){
-      gridHTML+='<div class="campo"><div class="label">'+campo+'</div><div class="valor">'+(d[campo]??'-')+'</div></div>';
-    }
+    // Campos expediente — agrupados
+    const LABELS = {
+      numero_ted:'N° TED', fecha_ingreso:'Fecha Ingreso', id_docusign:'ID Docusign',
+      comprobante_egreso:'Comprobante Egreso', fecha_pago:'Fecha de Pago',
+      pp:'PP', fecha_nomina:'Fecha Nómina', analista:'Analista',
+      tipo_pago:'Tipo de Pago', monto_total:'Monto Total',
+      centro_costo:'Centro de Costo', cuenta_corriente:'Cuenta Corriente',
+      moneda:'Moneda', numero_nomina:'N° Nómina', updated_at:'Última actualización'
+    };
+    const fmtVal = (v) => (v!=null && String(v).trim()!=='' && String(v).trim()!=='-') ? String(v) : null;
+    const fmtFecha = (v) => {
+      if(!v) return null;
+      // Acepta YYYY-MM-DD o DD-MM-YYYY
+      const s = String(v).trim();
+      const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      const dmy = s.match(/^(\d{2})-(\d{2})-(\d{4})/);
+      if(iso) return iso[3]+'-'+iso[2]+'-'+iso[1];
+      if(dmy) return s;
+      return s;
+    };
+    const fmtMonto = (v) => {
+      if(v==null || String(v).trim()==='') return null;
+      const n = parseFloat(v);
+      if(isNaN(n)) return String(v);
+      return '$'+Math.round(n).toLocaleString('es-CL');
+    };
+    const FECHAS = ['fecha_ingreso','fecha_pago','fecha_nomina','updated_at'];
+    const MONTOS = ['monto_total'];
+    const campo = (key, cls='') => {
+      let val;
+      if(FECHAS.includes(key)) val = fmtFecha(d[key]);
+      else if(MONTOS.includes(key)) val = fmtMonto(d[key]);
+      else val = fmtVal(d[key]);
+      return '<div class="campo '+ cls +'"><div class="label">'+(LABELS[key]||key)+'</div><div class="valor'+(val?'':' vacio')+'">'+(val||'Sin datos')+'</div></div>';
+    };
+    let gridHTML = '';
+
+    // Grupo 1: Identificación
+    gridHTML += '<div class="grupo-titulo">📋 Identificación</div>';
+    gridHTML += '<div class="grid">';
+    gridHTML += campo('numero_ted','destacado');
+    gridHTML += campo('fecha_ingreso');
+    gridHTML += campo('id_docusign');
+    gridHTML += campo('tipo_pago');
+    gridHTML += campo('analista');
+    gridHTML += campo('pp');
+    gridHTML += '</div>';
+
+    // Grupo 2: Pago
+    gridHTML += '<div class="grupo-titulo">💰 Información de Pago</div>';
+    gridHTML += '<div class="grid">';
+    gridHTML += campo('monto_total', 'destacado');
+    gridHTML += campo('moneda');
+    gridHTML += campo('fecha_pago', tramitado?'destacado':'alerta');
+    gridHTML += campo('numero_nomina', tramitado?'destacado':'alerta');
+    gridHTML += campo('fecha_nomina');
+    gridHTML += campo('comprobante_egreso');
+    gridHTML += '</div>';
+
+    // Grupo 3: Destino
+    gridHTML += '<div class="grupo-titulo">🏦 Destino</div>';
+    gridHTML += '<div class="grid">';
+    gridHTML += campo('cuenta_corriente');
+    gridHTML += campo('centro_costo');
     gridHTML += '</div>';
 
     resultado.innerHTML='<div class="seccion"><h2>📄 Expediente Encontrado</h2>'+badgeHTML+btnCE+rechazosHTML+gridHTML+'</div>';
