@@ -741,20 +741,16 @@ async function buscarPorRutOFolio(tipo){
             : '<span style="background:#fffbeb;color:#92400e;border:1px solid #fcd34d;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:bold">⏳ EN PROCESO</span>';
           tabla += '<div style="margin-bottom:12px">'+badge+'</div>';
 
-          // Rechazos bancarios — solo el más reciente por RUT
-          const todosRechazos = recMap[tedNum] || [];
-          const latestMap = {};
-          todosRechazos.forEach(r => {
-            const key = r.rut || r.beneficiario || Math.random();
-            if(!latestMap[key] || r.fecha > latestMap[key].fecha) latestMap[key] = r;
-          });
-          const rechazos = Object.values(latestMap);
-          if(rechazos.length === 0){
+          // Rechazos bancarios por RUT de cada fila del devengo asociada a este TED
+          const rutsDeTed = [...new Set(filas.filter(f=>fmt(f.nro_ref)===tedNum).map(f=>fmt(f.rut)).filter(r=>r!=='-'))];
+          const rechazosDelTed = rutsDeTed.map(r=>recPorRut[r]).filter(Boolean);
+
+          if(rechazosDelTed.length === 0){
             tabla += '<div style="display:flex;align-items:center;gap:8px;background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:bold;margin-bottom:12px;border-left:4px solid #10b981">✅ Sin rechazos bancarios</div>';
           } else {
             tabla += '<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444">';
-            tabla += '<div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios ('+rechazos.length+')</div>';
-            rechazos.forEach((r,idx)=>{
+            tabla += '<div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios ('+rechazosDelTed.length+')</div>';
+            rechazosDelTed.forEach((r,idx)=>{
               const fmtR = (v) => (v!=null && String(v).trim()!=='') ? String(v) : '-';
               const fmtFR = (v) => { if(!v) return '-'; const s=String(v).trim(); const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return iso?iso[3]+'-'+iso[2]+'-'+iso[1]:s; };
               tabla += '<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px">';
