@@ -999,7 +999,7 @@ function poblarFiltrosReporte(){
   if(el_cen&&el_cen.options.length<=1) centros.forEach(c=>{const o=document.createElement('option');o.value=c;o.text=c;el_cen.appendChild(o);});
 }
 
-function exportarExcel(tipo){
+async function exportarExcel(tipo){
   if(!_expData){alert('Carga los datos primero navegando al Dashboard');return;}
   let datos,nombre;
   if(tipo==='expedientes'){datos=_expData;nombre='Expedientes_Completo';}
@@ -1007,14 +1007,34 @@ function exportarExcel(tipo){
   else if(tipo==='aging'){
     datos=_expData.filter(d=>!esTramitado(d)).map(d=>({...d,dias_pendiente:diasDesde(d.fecha_ingreso),tramo_aging:diasDesde(d.fecha_ingreso)<=5?'0-5 días':diasDesde(d.fecha_ingreso)<=10?'6-10 días':diasDesde(d.fecha_ingreso)<=20?'11-20 días':'+20 días'})).sort((a,b)=>b.dias_pendiente-a.dias_pendiente);
     nombre='Reporte_Aging';
-  } else {alert('Rechazos: navega al panel de rechazos para exportar');return;}
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.json_to_sheet(datos);
-  XLSX.utils.book_append_sheet(wb,ws,'Datos');
-  XLSX.writeFile(wb,`${nombre}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  } else if(tipo==='rechazos'){
+    const{data:rdata}=await sb.from('rechazos').select('*').limit(10000);
+    if(!rdata||rdata.length===0){alert('No hay datos de rechazos');return;}
+    exportarConBordes(rdata,'Rechazos','Rechazos_Bancarios_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    return;
+  } else { return; }
+  exportarConBordes(datos,'Datos',`${nombre}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-function exportarFiltrado(){
+function exportarConBordes(datos, nombreHoja, nombreArchivo){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(datos);
+  // Aplicar bordes a todas las celdas
+  const rango=XLSX.utils.decode_range(ws['!ref']||'A1');
+  const estiloBorde={style:'thin',color:{rgb:'000000'}};
+  const estilo={border:{top:estiloBorde,bottom:estiloBorde,left:estiloBorde,right:estiloBorde}};
+  for(let r=rango.s.r;r<=rango.e.r;r++){
+    for(let c=rango.s.c;c<=rango.e.c;c++){
+      const celda=XLSX.utils.encode_cell({r,c});
+      if(!ws[celda]) ws[celda]={t:'z',v:''};
+      ws[celda].s=estilo;
+    }
+  }
+  XLSX.utils.book_append_sheet(wb,ws,nombreHoja);
+  XLSX.writeFile(wb,nombreArchivo,{bookSST:false,cellStyles:true});
+}
+
+async function exportarFiltrado(){
   if(!_expData){alert('Carga los datos primero navegando al Dashboard');return;}
   const mes=document.getElementById('rep-mes').value,ana=document.getElementById('rep-analista').value,cen=document.getElementById('rep-centro').value,est=document.getElementById('rep-estado').value;
   let f=_expData;
@@ -1024,10 +1044,7 @@ function exportarFiltrado(){
   if(est==='tramitado') f=f.filter(esTramitado);
   else if(est==='proceso') f=f.filter(d=>!esTramitado(d));
   if(f.length===0){alert('No hay datos con esos filtros');return;}
-  const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.json_to_sheet(f);
-  XLSX.utils.book_append_sheet(wb,ws,'Filtrado');
-  XLSX.writeFile(wb,`Expedientes_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`);
+  exportarConBordes(f,'Filtrado',`Expedientes_Filtrado_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 // ── FETCH ALL (paginado para superar límite de 1000) ──
