@@ -167,6 +167,23 @@ table.tbl tr:hover td{ background:#fafbfc; }
 .chart-select{ padding:5px 10px; border:2px solid var(--borde); border-radius:8px; font-size:12px; background:white; cursor:pointer; }
 .chart-canvas-wrap{ position:relative; width:100%; height:260px; }
 
+/* ══ DASHBOARD EJECUTIVO ══ */
+.kpi-semaforo{ border-top-width:6px !important; position:relative; }
+.kpi-semaforo::after{ content:''; position:absolute; top:8px; right:8px; width:10px; height:10px; border-radius:50%; }
+.kpi-meta-verde::after{ background:#10b981; box-shadow:0 0 8px rgba(16,185,129,0.6); }
+.kpi-meta-amarillo::after{ background:#f59e0b; box-shadow:0 0 8px rgba(245,158,11,0.6); }
+.kpi-meta-rojo::after{ background:#ef4444; box-shadow:0 0 8px rgba(239,68,68,0.6); }
+.kpi-meta-label{ font-size:10px; color:#94a3b8; margin-top:4px; }
+.heatmap-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-top:8px; }
+.heatmap-cell{ aspect-ratio:1; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; cursor:default; transition:0.15s; }
+.heatmap-cell:hover{ transform:scale(1.2); z-index:1; }
+.heatmap-day-label{ font-size:10px; color:#94a3b8; text-align:center; padding:2px 0; }
+.heatmap-legend{ display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:#64748b; }
+.heatmap-legend-box{ width:12px; height:12px; border-radius:2px; }
+.tendencia-wrap{ position:relative; width:100%; height:220px; }
+.btn-pdf{ background:linear-gradient(135deg,#0033A0,#002171); color:white; border:none; border-radius:10px; padding:10px 20px; font-size:13px; font-weight:bold; cursor:pointer; display:flex; align-items:center; gap:8px; transition:0.2s; }
+.btn-pdf:hover{ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,51,160,0.3); }
+
 /* ══ RECHAZOS PANEL ══ */
 .upload-area{ border:2px dashed #fcd34d; border-radius:12px; padding:20px; text-align:center; background:#fffbeb; cursor:pointer; transition:0.2s; }
 .upload-area:hover{ border-color:var(--naranja); }
@@ -272,7 +289,7 @@ table.tbl tr:hover td{ background:#fafbfc; }
         <div class="nav-item" onclick="navegarA('alertas',this)"><span class="nav-icon">⚠️</span> Alertas y Control <span class="nav-badge" id="badge-alertas">0</span></div>
         <div class="nav-section">Análisis</div>
         <div class="nav-item" onclick="navegarA('dashboard',this)"><span class="nav-icon">📊</span> Dashboard Analítico</div>
-        <div class="nav-item" onclick="navegarA('rechazos-panel',this)"><span class="nav-icon">🏦</span> Rechazos Bancarios</div>
+        <div class="nav-item" id="nav-rechazos-panel" style="display:none" onclick="navegarA('rechazos-panel',this)"><span class="nav-icon">🏦</span> Rechazos Bancarios</div>
         <div class="nav-section">Administración</div>
         <div class="nav-item" onclick="navegarA('reporteria',this)"><span class="nav-icon">📋</span> Reportería</div>
       </div>
@@ -374,7 +391,13 @@ table.tbl tr:hover td{ background:#fafbfc; }
             <div id="dash-tabla-cc"></div>
             <div id="dash-tabla-analista"></div>
             <div id="dash-rechazos"></div>
+            <div id="dash-heatmap"></div>
             <div id="dash-detalle-wrap"></div>
+            <div class="card" style="margin-top:20px;background:linear-gradient(135deg,#0033A0,#002171);color:white">
+              <h3 style="color:white;border-bottom-color:rgba(255,255,255,0.2)">🖨 Exportar Resumen Ejecutivo</h3>
+              <p style="font-size:13px;opacity:0.8;margin-bottom:16px">Genera un PDF con los indicadores clave del período seleccionado, listo para presentar.</p>
+              <button class="btn-pdf" onclick="exportarPDF()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3)">🖨 Generar PDF Ejecutivo</button>
+            </div>
           </div>
         </div>
 
@@ -460,6 +483,9 @@ function mostrarApp(user){
   const email = user?.email||'';
   document.getElementById('sb-email').textContent = email;
   document.getElementById('sb-nombre').textContent = email.split('@')[0].replace('.',' ').replace(/\b\w/g,c=>c.toUpperCase());
+  // Solo mostrar sección de carga de rechazos al administrador
+  const navR = document.getElementById('nav-rechazos-panel');
+  if(navR) navR.style.display = email.toLowerCase()==='mespinosa@anid.cl' ? 'flex' : 'none';
   cargarInicio();
   cargarUltimaActualizacion();
 }
@@ -632,13 +658,20 @@ function renderDashboard(data){
     return s+(dias/arr.length);
   },0);
 
+  // Semáforo por metas
+  const metaPct=90, metaTiempo=7, metaRiesgo=0.2;
+  const semPct=pct>=metaPct?'verde':pct>=70?'amarillo':'rojo';
+  const semTiempo=tiempoPromedio<=metaTiempo?'verde':tiempoPromedio<=14?'amarillo':'rojo';
+  const montoRiesgo=data.filter(d=>!esTramitado(d)).reduce((s,d)=>s+(parseFloat(d.monto_total)||0),0);
+  const semRiesgo=montoRiesgo===0?'verde':montoRiesgo<montoTotal*metaRiesgo?'amarillo':'rojo';
+
   document.getElementById('dash-kpis').innerHTML=`
-    <div class="kpi" onclick="mostrarDetalle('todos')" title="Ver todos"><div class="kpi-valor">${total}</div><div class="kpi-label">Total</div></div>
-    <div class="kpi verde" onclick="mostrarDetalle('tramitados')"><div class="kpi-valor">${tramitados}</div><div class="kpi-label">✅ Tramitados</div><div class="kpi-sub">${pct}%</div></div>
-    <div class="kpi amarillo" onclick="mostrarDetalle('en_proceso')"><div class="kpi-valor">${enProceso}</div><div class="kpi-label">⏳ En Proceso</div></div>
+    <div class="kpi kpi-semaforo kpi-meta-${semPct}" onclick="mostrarDetalle('todos')"><div class="kpi-valor">${total}</div><div class="kpi-label">Total Expedientes</div></div>
+    <div class="kpi verde kpi-semaforo kpi-meta-${semPct}" onclick="mostrarDetalle('tramitados')"><div class="kpi-valor">${pct}%</div><div class="kpi-label">✅ % Tramitado</div><div class="kpi-meta-label">Meta: ${metaPct}%</div></div>
+    <div class="kpi amarillo kpi-semaforo kpi-meta-${enProceso===0?'verde':enProceso<5?'amarillo':'rojo'}" onclick="mostrarDetalle('en_proceso')"><div class="kpi-valor">${enProceso}</div><div class="kpi-label">⏳ En Proceso</div></div>
+    <div class="kpi rojo kpi-semaforo kpi-meta-${semRiesgo}"><div class="kpi-valor" style="font-size:12px">${fmtM(montoRiesgo)}</div><div class="kpi-label">💰 Monto en Riesgo</div><div class="kpi-meta-label">Sin tramitar</div></div>
+    <div class="kpi kpi-semaforo kpi-meta-${semTiempo} morado"><div class="kpi-valor">${Math.round(tiempoPromedio)} días</div><div class="kpi-label">⏱ Tiempo Prom.</div><div class="kpi-meta-label">Meta: ≤${metaTiempo} días</div></div>
     <div class="kpi"><div class="kpi-valor" style="font-size:12px">${fmtM(montoTotal)}</div><div class="kpi-label">Monto Total</div></div>
-    <div class="kpi verde"><div class="kpi-valor" style="font-size:12px">${fmtM(montoPagado)}</div><div class="kpi-label">Monto Pagado</div></div>
-    <div class="kpi morado"><div class="kpi-valor">${Math.round(tiempoPromedio)} días</div><div class="kpi-label">⏱ Tiempo Prom.</div></div>
   `;
 
   // Por mes (monto)
@@ -674,6 +707,60 @@ function renderDashboard(data){
     renderChart('aging','📊 Aging — Días Sin Tramitar',Object.keys(aging),Object.values(aging),'#ef4444',false,false);
     renderChart('ana','👤 Expedientes por Analista',anasOrd,anasOrd.map(a=>porAna[a].total),'#8b5cf6',false,false);
   },80);
+
+  // Tendencia mensual % tramitado
+  const tendencia={};
+  data.forEach(d=>{ const m=d.fecha_ingreso?.slice(0,7)||'Sin fecha'; if(!tendencia[m]) tendencia[m]={total:0,tram:0}; tendencia[m].total++; if(esTramitado(d)) tendencia[m].tram++; });
+  const tendMeses=Object.keys(tendencia).sort();
+  const tendLabels=tendMeses.map(m=>{ const[y,mo]=m.split('-'); return mo?MESES[parseInt(mo)]+' '+y:m; });
+  const tendVals=tendMeses.map(m=>tendencia[m].total>0?Math.round(tendencia[m].tram/tendencia[m].total*100):0);
+
+  // Heatmap por día de ingreso
+  const heatmap={};
+  data.forEach(d=>{ if(!d.fecha_ingreso) return; const day=new Date(d.fecha_ingreso).getDate(); if(!heatmap[day]) heatmap[day]=0; heatmap[day]++; });
+  const maxHeat=Math.max(...Object.values(heatmap),1);
+
+  const heatmapHTML=(()=>{
+    const dias=['L','M','X','J','V','S','D'];
+    let h='<div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px">📅 Ingreso de expedientes por día del mes</div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(31,1fr);gap:2px">';
+    for(let d=1;d<=31;d++){
+      const v=heatmap[d]||0;
+      const int=Math.round(v/maxHeat*255);
+      const bg=v===0?'#f1f5f9':`rgb(${255-Math.round(int*0.7)},${255-Math.round(int*0.5)},${255-int})`;
+      const txt=v>0?'#0033A0':'#94a3b8';
+      h+=`<div title="Día ${d}: ${v} expedientes" style="background:${bg};border-radius:4px;padding:4px 2px;text-align:center;font-size:10px;font-weight:bold;color:${txt};cursor:default">${d}</div>`;
+    }
+    h+='</div>';
+    h+='<div class="heatmap-legend"><div class="heatmap-legend-box" style="background:#f1f5f9"></div>0<div class="heatmap-legend-box" style="background:#b3c6f7;margin-left:8px"></div>Poco<div class="heatmap-legend-box" style="background:#0033A0;margin-left:8px"></div>Mucho</div>';
+    return h;
+  })();
+
+  // Insertar tendencia y heatmap
+  const dashGraf=document.getElementById('dash-graficos');
+  if(dashGraf){
+    const tendCard=document.createElement('div');
+    tendCard.className='card';
+    tendCard.style.cssText='grid-column:1/-1';
+    tendCard.innerHTML='<h3>📈 Tendencia Mensual — % Tramitado</h3><div class="tendencia-wrap"><canvas id="canvas-tendencia"></canvas></div>';
+    dashGraf.appendChild(tendCard);
+    setTimeout(()=>{
+      if(_charts['tendencia']?.chart) _charts['tendencia'].chart.destroy();
+      const ctx=document.getElementById('canvas-tendencia');
+      if(ctx){
+        _charts['tendencia']={meta:{},chart:new Chart(ctx.getContext('2d'),{
+          type:'line',
+          data:{labels:tendLabels,datasets:[
+            {label:'% Tramitado',data:tendVals,borderColor:'#0033A0',backgroundColor:'rgba(0,51,160,0.1)',fill:true,tension:0.4,pointRadius:5,pointBackgroundColor:'#0033A0'},
+            {label:'Meta 90%',data:tendLabels.map(()=>90),borderColor:'#10b981',borderDash:[5,5],pointRadius:0,fill:false}
+          ]},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:11}}}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}
+        })};
+      }
+    },100);
+  }
+
+  document.getElementById('dash-heatmap').innerHTML='<div class="card">'+heatmapHTML+'</div>';
 
   // Tablas CC y Analista
   const porCC={};
@@ -775,7 +862,7 @@ async function buscarExpediente(){
   const{data:{session}}=await sb.auth.getSession();
   if(!session){mostrarAuth();return;}
   try{
-    const tedBase=(ted.includes('/')?ted.split('/')[0].trim():ted.trim()).toUpperCase();
+    const tedBase=(ted.includes('/')?ted.split('/')[0].trim():ted.match(/^E\d+/i)?ted.match(/^E\d+/i)[0]:ted.trim()).toUpperCase();
     const[expRes,recRes]=await Promise.all([
       sb.from('expedientes').select('*').ilike('numero_ted',ted).limit(5000),
       sb.from('rechazos').select('*').ilike('ted_pago',tedBase).order('fecha',{ascending:true})
@@ -785,8 +872,16 @@ async function buscarExpediente(){
     const d=expRes.data[0];
     const tramitado=fmtV(d.numero_nomina)&&fmtV(d.fecha_pago);
     const todosRec=recRes.data||[];
+    const fechaIng2 = d.fecha_ingreso ? new Date(d.fecha_ingreso) : null;
+    const fechaPago2 = d.fecha_pago ? new Date(d.fecha_pago) : new Date();
+    // Solo rechazos dentro del rango del expediente
+    const recFiltrados = todosRec.filter(r=>{
+      if(!fechaIng2) return true;
+      const fr = new Date(r.fecha);
+      return fr >= fechaIng2 && fr <= fechaPago2;
+    });
     const latestMap={};
-    todosRec.forEach(r=>{ const k=r.rut||r.beneficiario||Math.random(); if(!latestMap[k]||r.fecha>latestMap[k].fecha) latestMap[k]=r; });
+    recFiltrados.forEach(r=>{ const k=r.rut||r.beneficiario||Math.random(); if(!latestMap[k]||r.fecha>latestMap[k].fecha) latestMap[k]=r; });
     const rechazos=Object.values(latestMap);
     const campo=(key,label,cls='')=>{
       const val=key==='fecha_ingreso'||key==='fecha_pago'||key==='fecha_nomina'?fmtF(d[key]):fmtV(d[key]);
@@ -802,19 +897,28 @@ async function buscarExpediente(){
     if(rechazos.length===0){
       recHTML='<div style="background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:bold;margin-bottom:12px;border-left:4px solid #10b981">✅ Sin rechazos bancarios</div>';
     } else {
-      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${r.beneficiario||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div></div></div>`).join('')}</div>`;
+      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${r.beneficiario||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div>${(()=>{ const ceR=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
+              const esCE2=ceR&&(/^CE\d+/i.test(ceR)||/^\d+$/.test(ceR));
+              const esNombre2=ceR&&!esCE2;
+              return ceR?`<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Comprobante Egreso</span><br><span style="background:${esCE2?'#dcfce7':esNombre2?'#fef3c7':'#f1f5f9'};color:${esCE2?'#166534':esNombre2?'#92400e':'#64748b'};padding:2px 8px;border-radius:6px;font-weight:bold">${esCE2?'✅ ':esNombre2?'⏳ Pendiente':''}${esCE2?ceR:''}</span></div>`:''; })()}</div></div>`).join('')}</div>`;
     }
-    resultado.innerHTML=`<div class="card">
-      <h3>📄 Expediente Encontrado</h3>
-      <div class="estado-badge ${tramitado?'tramitado':'en-proceso'}">${tramitado?'✅ TRAMITADO':'⏳ EN PROCESO DE TRAMITACIÓN'}<small style="font-size:12px;font-weight:normal;opacity:0.8;margin-left:8px">${tramitado?'Nómina y fecha de pago registradas':'Pendiente de nómina o fecha de pago'}</small></div>
-      ${ceLink}${recHTML}
-      <div class="grupo-titulo">📋 Identificación</div>
-      <div class="campos-grid">${campo('numero_ted','N° TED','destacado')}${campo('fecha_ingreso','Fecha Ingreso')}${campo('id_docusign','ID Docusign')}${campo('tipo_pago','Tipo de Pago')}${campo('analista','Analista')}${campo('pp','PP')}</div>
-      <div class="grupo-titulo">💰 Información de Pago</div>
-      <div class="campos-grid">${campo('monto_total','Monto Total','destacado')}${campo('moneda','Moneda')}${campo('fecha_pago','Fecha Pago',tramitado?'destacado':'alerta')}${campo('numero_nomina','N° Nómina',tramitado?'destacado':'alerta')}${campo('fecha_nomina','Fecha Nómina')}${campo('comprobante_egreso','Comprobante Egreso')}</div>
-      <div class="grupo-titulo">🏦 Destino</div>
-      <div class="campos-grid">${campo('cuenta_corriente','Cuenta Corriente')}${campo('centro_costo','Centro de Costo')}</div>
-    </div>`;
+    const lTED = t => { if(!t) return '-'; const m=String(t).match(/^E\d+/i); return m?m[0]:String(t); };
+
+    let htmlExp = '<div class="card"><h3>📄 Expediente Encontrado</h3>';
+    htmlExp += '<div class="estado-badge '+(tramitado?'tramitado':'en-proceso')+'">'+(tramitado?'✅ TRAMITADO':'⏳ EN PROCESO DE TRAMITACIÓN')+'<small style="font-size:12px;font-weight:normal;opacity:0.8;margin-left:8px">'+(tramitado?'Nómina y fecha de pago registradas':'Pendiente de nómina o fecha de pago')+'</small></div>';
+    if(ceLink) htmlExp += ceLink;
+    htmlExp += recHTML;
+    htmlExp += '<div class="grupo-titulo">📋 Identificación</div>';
+    htmlExp += '<div class="campos-grid">'+campo('numero_ted','N° TED','destacado')+campo('fecha_ingreso','Fecha Ingreso')+campo('id_docusign','ID Docusign')+campo('tipo_pago','Tipo de Pago')+campo('analista','Analista')+campo('pp','PP')+'</div>';
+    htmlExp += '<div class="grupo-titulo">💰 Información de Pago</div>';
+    htmlExp += '<div class="campos-grid">'+campo('monto_total','Monto Total','destacado')+campo('moneda','Moneda')+campo('fecha_pago','Fecha Pago',tramitado?'destacado':'alerta')+campo('numero_nomina','N° Nómina',tramitado?'destacado':'alerta')+campo('fecha_nomina','Fecha Nómina')+campo('comprobante_egreso','Comprobante Egreso')+'</div>';
+    htmlExp += '<div class="grupo-titulo">🏦 Destino</div>';
+    htmlExp += '<div class="campos-grid">'+campo('cuenta_corriente','Cuenta Corriente')+campo('centro_costo','Centro de Costo')+'</div>';
+    htmlExp += '</div>';
+
+
+    resultado.innerHTML = htmlExp;
+
   } catch(err){ resultado.innerHTML='<div class="card"><h3>Error</h3><p>Ocurrió un problema</p></div>'; }
 }
 
@@ -838,13 +942,23 @@ async function buscarPorRutOFolio(tipo){
 
     // Mapear cada TED raw a su base numérica
     const tedBaseMap={}; // E7332AB → E7332
-    todosTedsRaw.forEach(t=>{ tedBaseMap[t]=t.replace(/[A-Za-z]+$/,''); });
+    todosTedsRaw.forEach(t=>{ const m=t.match(/^E\d+/i); tedBaseMap[t]=m?m[0]:t.replace(/[^E\d]/gi,''); });
 
     // TEDs base únicos para buscar en expedientes
     const tedsBase=[...new Set(Object.values(tedBaseMap))];
 
     // Para cada base, buscar el expediente y guardar las variantes
-    let expMap={},tedVariantes={},recPorRut={};
+    let expMap={},tedVariantes={},recPorRut={},nombrePorRut={};
+
+    // Buscar nombres en tabla beneficiarios
+    for(const rut of rutsUnicos){
+      const rutNum=rut.split('-')[0];
+      const benRes=await sb.from('beneficiarios').select('razon_social,dv').eq('rut',rutNum).limit(1);
+      if(benRes.data&&benRes.data.length>0){
+        const b=benRes.data[0];
+        nombrePorRut[rut]=b.razon_social+(b.dv?'-'+b.dv:'');
+      }
+    }
     for(const base of tedsBase){
       const expRes2=await sb.from('expedientes').select('*').ilike('numero_ted',base+'%').limit(10);
       if(expRes2.data&&expRes2.data.length>0) expMap[base]=expRes2.data[0];
@@ -858,39 +972,102 @@ async function buscarPorRutOFolio(tipo){
       if(recRes2.data&&recRes2.data.length>0) recPorRut[rut]=recRes2.data[0];
     }
     const fmtM2=v=>'$'+Math.round(parseFloat(v)||0).toLocaleString('es-CL');
-    let html=`<div class="card"><h3>${tipo==='rut'?'👤 Resultados por RUT':'📄 Resultados por Folio'}: ${val}</h3>`;
-    html+=`<div style="font-size:13px;color:#64748b;margin-bottom:12px">${filas.length} registro(s) encontrado(s)</div>`;
-    html+=`<div style="overflow-x:auto;margin-bottom:20px"><table class="tbl"><thead><tr><th>N° Dev.</th><th>Proyecto</th><th>N° Ref. (TED)</th><th>RUT</th><th>Monto Inicial</th><th>Pagos</th><th>Emisión</th></tr></thead><tbody>`;
-    filas.forEach(r=>{
-      const t=(r.nro_ref!=null&&String(r.nro_ref).trim()!=='')?String(r.nro_ref).trim():'-';
-      html+=`<tr><td>${r.nro_dev||'-'}</td><td>${r.proyecto||'-'}</td><td><strong>${t}</strong></td><td>${r.rut||'-'}</td><td>${fmtM2(r.monto_inicial)}</td><td>${fmtM2(r.pagos)}</td><td>${fmtF(r.emision)}</td></tr>`;
+    // Obtener nombre desde beneficiarios
+    const rutBen = rutsUnicos[0]||val;
+    const nombreBen = nombrePorRut[rutBen]||null;
+    const headerInfo = nombreBen
+      ? `<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;margin-bottom:14px;border-left:4px solid var(--azul);display:flex;align-items:center;gap:12px"><span style="font-size:22px">👤</span><div><div style="font-weight:800;font-size:16px;color:var(--azul)">${nombreBen}</div><div style="font-size:13px;color:#64748b">RUT: ${rutBen}</div></div></div>`
+      : '';
+    let html=`<div class="card"><h3>${tipo==='rut'?'👤 Resultados por RUT':'📄 Resultados por Folio'}: ${val}</h3>${headerInfo}`;
+
+    // Solo mostrar TEDs que tengan comprobante de egreso registrado
+    const tedsConEgreso = tedsUnicos.filter(tedNum=>{
+      const exp=expMap[tedNum];
+      const ce=exp?.comprobante_egreso;
+      return ce && String(ce).trim()!=='' && String(ce).trim()!=='0' && String(ce).toLowerCase()!=='null';
     });
-    html+=`</tbody></table></div>`;
-    if(tedsUnicos.length>0){
+
+    if(tedsConEgreso.length>0){
       html+=`<div class="grupo-titulo">💰 Información de Pago por Expediente</div>`;
-      tedsUnicos.forEach(tedNum=>{
+      tedsConEgreso.forEach(tedNum=>{
         const exp=expMap[tedNum];
         const tram=exp&&fmtV(exp.numero_nomina)&&fmtV(exp.fecha_pago);
         // Mostrar variantes si existen (E7332AB, E7332AC, etc.)
         const variantes=tedVariantes[tedNum]||[tedNum];
-        const variantesLabel=variantes.length>1?` <span style="background:#eff6ff;color:#1d4ed8;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:normal">${variantes.length} variantes: ${variantes.join(', ')}</span>`:'';
+        const variantesLabel='';
         // RUTs de todas las variantes
         const rutsDeTed=[...new Set(filas.filter(f=>variantes.includes(String(f.nro_ref||'').trim())).map(f=>String(f.rut||'').trim()).filter(r=>r))];
-        const rechazosDelTed=rutsDeTed.map(r=>recPorRut[r]).filter(Boolean);
+        // Filtrar rechazos por fecha: solo los que ocurrieron entre fecha_ingreso y fecha_pago del expediente
+        const fechaIng = exp?.fecha_ingreso ? new Date(exp.fecha_ingreso) : null;
+        const fechaPago = exp?.fecha_pago ? new Date(exp.fecha_pago) : new Date();
+        const rechazosDelTed=rutsDeTed.map(r=>recPorRut[r]).filter(rec=>{
+          if(!rec) return false;
+          if(!fechaIng) return true; // si no hay fecha ingreso, mostrar igual
+          const fechaRec = new Date(rec.fecha);
+          return fechaRec >= fechaIng && fechaRec <= fechaPago;
+        });
         html+=`<div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--azul)">`;
-        html+=`<div style="font-size:13px;font-weight:800;color:var(--azul);margin-bottom:10px;text-transform:uppercase">📋 TED: ${tedNum}${variantesLabel}</div>`;
+        const ceExp = exp?.comprobante_egreso ? String(exp.comprobante_egreso).trim() : null;
+        const ceLabel = ceExp && ceExp!=='0' ? ` <span style="background:#dcfce7;color:#166534;font-size:12px;padding:2px 10px;border-radius:8px;font-weight:700;text-transform:none">📄 CE${ceExp}</span>` : '';
+        html+=`<div style="font-size:13px;font-weight:800;color:var(--azul);margin-bottom:10px;text-transform:uppercase;display:flex;align-items:center;gap:8px;flex-wrap:wrap">📋 TED: ${tedNum}${variantesLabel}${ceLabel}</div>`;
         if(exp){
           html+=`<div class="estado-badge ${tram?'tramitado':'en-proceso'} "style="margin-bottom:10px;font-size:13px">${tram?'✅ TRAMITADO':'⏳ EN PROCESO'}</div>`;
           if(rechazosDelTed.length===0){
             html+=`<div style="background:#ecfdf5;color:#065f46;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:bold;margin-bottom:10px;border-left:3px solid #10b981">✅ Sin rechazos bancarios</div>`;
           } else {
-            html+=`<div style="background:#fef2f2;border-radius:8px;padding:10px 12px;margin-bottom:10px;border-left:3px solid #ef4444"><div style="color:#991b1b;font-size:13px;font-weight:bold;margin-bottom:6px">⚠️ ${rechazosDelTed.length} rechazo(s)</div>`;
-            rechazosDelTed.forEach(r=>{ html+=`<div style="font-size:12px;color:#64748b">${fmtF(r.fecha)} — ${r.beneficiario||''} — ${r.rut||''} — Cta: ${r.cuenta_corriente||''}</div>`; });
+              html+=`<div style="background:#fef2f2;border-radius:8px;padding:10px 12px;margin-bottom:10px;border-left:3px solid #ef4444"><div style="color:#991b1b;font-size:13px;font-weight:bold;margin-bottom:6px">⚠️ ${rechazosDelTed.length} rechazo(s)</div>`;
+            rechazosDelTed.forEach(r=>{
+              const ceRaw=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
+              // Si el valor parece un nombre (tiene espacios o es solo letras) → Pendiente
+              const esCE = ceRaw && (/^CE\d+/i.test(ceRaw) || /^\d+$/.test(ceRaw));
+              const esNombre = ceRaw && !esCE;
+              const ceTag = esCE
+                ? ` — <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">✅ ${ceRaw}</span>`
+                : esNombre
+                  ? ` — <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">⏳ Pendiente</span>`
+                  : ' — <span style="color:#94a3b8;font-size:11px">Sin CE</span>';
+              html+=`<div style="font-size:12px;color:#64748b;margin-bottom:3px">${fmtF(r.fecha)} — ${r.beneficiario||''} — ${r.rut||''} — Cta: ${r.cuenta_corriente||''}${ceTag}</div>`;
+            });
             html+=`</div>`;
           }
           html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">`;
           const mc=(label,val)=>`<div style="background:white;border-radius:8px;padding:8px 10px;border-left:2px solid #dbe3ee"><div style="font-size:10px;text-transform:uppercase;color:#94a3b8;font-weight:700;margin-bottom:3px">${label}</div><div style="font-size:13px;color:#111827;font-weight:500">${val||'<span style="color:#cbd5e1;font-style:italic">Sin datos</span>'}</div></div>`;
           html+=mc('Fecha Ingreso',fmtF(exp.fecha_ingreso))+mc('Tipo Pago',fmtV(exp.tipo_pago))+mc('Monto',fmtM2(exp.monto_total))+mc('Moneda',fmtV(exp.moneda))+mc('Fecha Pago',fmtF(exp.fecha_pago))+mc('N° Nómina',fmtV(exp.numero_nomina))+mc('Analista',fmtV(exp.analista))+mc('Cuenta',fmtV(exp.cuenta_corriente));
+          // Botón detalle de pagos del devengo para este TED
+          const filasDelTed = filas.filter(f=>variantes.includes(String(f.nro_ref||'').trim()) && (parseFloat(f.pagos)||0)>0);
+          if(filasDelTed.length>0){
+            const detUID='devdet-'+tedNum.replace(/[^a-z0-9]/gi,'');
+            const limpiarTED2 = t => { if(!t) return '-'; const m=String(t).match(/^E\d+/i); return m?m[0]:String(t); };
+            const detalleHTML = filasDelTed.map(r=>{
+              const nom = nombrePorRut[r.rut||'']||'';
+              return `<tr><td>${r.rut||'-'}</td><td>${nom||'<span style="color:#94a3b8;font-style:italic">Sin nombre</span>'}</td><td>${limpiarTED2(r.nro_ref||'-')}</td><td><strong style="color:#059669">${fmtM2(r.pagos)}</strong></td><td>${fmtF(r.emision)}</td></tr>`;
+            }).join('');
+            html+=`<div style="margin-top:10px">
+              <button onclick="const el=document.getElementById('${detUID}');el.style.display=el.style.display==='none'?'block':'none';this.innerHTML=el.style.display==='none'?'📋 Ver Detalle de Pagos (${filasDelTed.length})':'▼ Ocultar Detalle'" 
+                style="background:#eff6ff;color:var(--azul);border:2px solid #bfdbfe;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:bold;cursor:pointer;width:100%">
+                📋 Ver Detalle de Pagos (${filasDelTed.length})
+              </button>
+              <div id="${detUID}" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:40px 20px" onclick="if(event.target===this)this.style.display='none'">
+                <div style="background:white;border-radius:16px;max-width:900px;margin:0 auto;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--gris)">
+                    <div>
+                      <div style="font-size:16px;font-weight:800;color:var(--azul)">📋 Detalle de Pagos — TED: ${tedNum}</div>
+                      <div style="font-size:12px;color:#64748b;margin-top:3px">${filasDelTed.length} pago(s) registrado(s)</div>
+                    </div>
+                    <button onclick="document.getElementById('${detUID}').style.display='none'" style="background:#f1f5f9;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:bold;cursor:pointer;color:#64748b">✕ Cerrar</button>
+                  </div>
+                  <div style="overflow-x:auto">
+                    <table class="tbl">
+                      <thead><tr><th>RUT</th><th>Nombre / Institución</th><th>TED</th><th>Monto Pagado</th><th>Emisión</th></tr></thead>
+                      <tbody>${detalleHTML}</tbody>
+                      <tfoot><tr style="background:#eff6ff"><td colspan="3" style="font-weight:800;color:var(--azul);padding:10px 12px">Total</td><td style="font-weight:800;color:#059669;padding:10px 12px">${fmtM2(filasDelTed.reduce((s,r)=>s+(parseFloat(r.pagos)||0),0))}</td><td></td></tr></tfoot>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+          }
+
           html+=`</div>`;
         } else { html+=`<div style="color:#64748b;font-size:13px;font-style:italic">No se encontró información de pago para este TED.</div>`; }
         html+=`</div>`;
@@ -1060,6 +1237,122 @@ async function fetchAll(tabla, columnas='*'){
     desde += PAGINA;
   }
   return todos;
+}
+
+// ── EXPORTAR PDF EJECUTIVO ──
+async function exportarPDF(){
+  const data = window._dashFiltered || _expData || [];
+  if(!data.length){ alert('Carga el dashboard primero'); return; }
+
+  const total=data.length, tramitados=data.filter(esTramitado).length, enProceso=total-tramitados;
+  const pct=total>0?Math.round(tramitados/total*100):0;
+  const montoTotal=data.reduce((s,d)=>s+(parseFloat(d.monto_total)||0),0);
+  const montoRiesgo=data.filter(d=>!esTramitado(d)).reduce((s,d)=>s+(parseFloat(d.monto_total)||0),0);
+  const tiempoPromedio=Math.round(data.filter(d=>esTramitado(d)&&d.fecha_ingreso&&d.fecha_pago).reduce((s,d,_,arr)=>{
+    return s+Math.max(0,Math.floor((new Date(d.fecha_pago)-new Date(d.fecha_ingreso))/(1000*60*60*24)))/arr.length;
+  },0));
+  const semColor=pct>=90?'#10b981':pct>=70?'#f59e0b':'#ef4444';
+  const hoy=new Date().toLocaleDateString('es-CL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const MESES2=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  // Por analista
+  const porAna={};
+  data.forEach(d=>{ const a=d.analista||'Sin asignar'; if(!porAna[a]) porAna[a]={total:0,tram:0}; porAna[a].total++; if(esTramitado(d)) porAna[a].tram++; });
+  const anaRows=Object.keys(porAna).sort((a,b)=>porAna[b].total-porAna[a].total).map(a=>{
+    const d=porAna[a],p=Math.round(d.tram/d.total*100),col=p>=80?'#059669':p>=50?'#d97706':'#dc2626';
+    return '<tr><td>'+a+'</td><td>'+d.total+'</td><td style="color:#059669;font-weight:bold">'+d.tram+'</td><td style="color:#d97706;font-weight:bold">'+(d.total-d.tram)+'</td><td style="color:'+col+';font-weight:bold">'+p+'%</td></tr>';
+  }).join('');
+
+  // Por centro de costo
+  const porCC={};
+  data.forEach(d=>{ const c=d.centro_costo||'Sin centro'; if(!porCC[c]) porCC[c]={count:0,monto:0,tram:0}; porCC[c].count++; porCC[c].monto+=parseFloat(d.monto_total)||0; if(esTramitado(d)) porCC[c].tram++; });
+  const ccRows=Object.keys(porCC).sort((a,b)=>porCC[b].monto-porCC[a].monto).map(c=>{
+    const d=porCC[c],p=Math.round(d.tram/d.count*100),col=p>=80?'#059669':p>=50?'#d97706':'#dc2626';
+    return '<tr><td>'+c+'</td><td>'+d.count+'</td><td style="color:#059669;font-weight:bold">'+d.tram+'</td><td style="color:#d97706;font-weight:bold">'+(d.count-d.tram)+'</td><td style="color:'+col+';font-weight:bold">'+p+'%</td><td style="font-weight:bold">'+fmtM(d.monto)+'</td></tr>';
+  }).join('');
+
+  // Por tipo de pago
+  const porTipo={};
+  data.forEach(d=>{ const t=d.tipo_pago||'Sin tipo'; if(!porTipo[t]) porTipo[t]={count:0,monto:0}; porTipo[t].count++; porTipo[t].monto+=parseFloat(d.monto_total)||0; });
+  const tipoRows=Object.keys(porTipo).sort((a,b)=>porTipo[b].monto-porTipo[a].monto).map(t=>{
+    return '<tr><td>'+t+'</td><td>'+porTipo[t].count+'</td><td style="font-weight:bold">'+fmtM(porTipo[t].monto)+'</td></tr>';
+  }).join('');
+
+  // Por mes
+  const porMes={};
+  data.forEach(d=>{ const m=d.fecha_ingreso?.slice(0,7)||'Sin fecha'; if(!porMes[m]) porMes[m]={count:0,tram:0,monto:0}; porMes[m].count++; porMes[m].monto+=parseFloat(d.monto_total)||0; if(esTramitado(d)) porMes[m].tram++; });
+  const mesRows=Object.keys(porMes).sort().map(m=>{
+    const d=porMes[m],p=Math.round(d.tram/d.count*100),col=p>=80?'#059669':p>=50?'#d97706':'#dc2626';
+    const[y,mo]=m.split('-');
+    return '<tr><td>'+(mo?MESES2[parseInt(mo)]+' '+y:m)+'</td><td>'+d.count+'</td><td style="color:#059669;font-weight:bold">'+d.tram+'</td><td style="color:#d97706;font-weight:bold">'+(d.count-d.tram)+'</td><td style="color:'+col+';font-weight:bold">'+p+'%</td><td style="font-weight:bold">'+fmtM(d.monto)+'</td></tr>';
+  }).join('');
+
+  // Expedientes críticos +10 días
+  const criticos=data.filter(d=>!esTramitado(d)&&diasDesde(d.fecha_ingreso)>10).sort((a,b)=>diasDesde(b.fecha_ingreso)-diasDesde(a.fecha_ingreso)).slice(0,20);
+  const criticosRows=criticos.map(d=>{
+    const dias=diasDesde(d.fecha_ingreso),col=dias>20?'#dc2626':'#d97706';
+    return '<tr><td style="font-weight:bold">'+d.numero_ted+'</td><td>'+fmtF(d.fecha_ingreso)+'</td><td style="color:'+col+';font-weight:bold">'+dias+' días</td><td>'+d.analista+'</td><td>'+fmtM(d.monto_total)+'</td><td>'+(d.tipo_pago||'-')+'</td></tr>';
+  }).join('');
+
+  // Rechazos activos
+  const {data:recData}=await sb.from('rechazos').select('rut,beneficiario,subdireccion,tipo_transferencia,fecha,numero_doc_solucion').order('fecha',{ascending:false}).limit(200);
+  const latestRec={};
+  (recData||[]).forEach(r=>{ const k=r.rut||r.beneficiario; if(!latestRec[k]) latestRec[k]=r; });
+  const recSinSol=Object.values(latestRec).filter(r=>{ const ce=r.numero_doc_solucion; return !ce||String(ce).toLowerCase()==='null'||String(ce).toLowerCase()==='empty'||String(ce).trim()===''; });
+  const recRows=recSinSol.slice(0,20).map(r=>'<tr><td>'+r.rut+'</td><td>'+(r.beneficiario||'-')+'</td><td>'+(r.subdireccion||'-')+'</td><td>'+(r.tipo_transferencia||'-')+'</td><td>'+fmtF(r.fecha)+'</td></tr>').join('');
+
+  const CSS = 'body{font-family:Segoe UI,Arial,sans-serif;color:#1f2937;font-size:13px}@page{margin:15mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}.pb{page-break-before:always}.header{background:linear-gradient(135deg,#0033A0,#002171);color:white;padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-radius:0 0 12px 12px;margin-bottom:20px}.header h1{font-size:20px;font-weight:800}.content{padding:0 8px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}.kpi{border-radius:10px;padding:14px;text-align:center;border-top:4px solid #0033A0}.kpi-val{font-size:22px;font-weight:800;margin-bottom:3px}.kpi-lbl{font-size:10px;text-transform:uppercase;color:#64748b;font-weight:600}.section-title{font-size:14px;font-weight:800;color:#0033A0;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #eef2f7}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}th{background:#f8fafc;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#64748b;border:1px solid #e2e8f0}td{padding:7px 10px;border:1px solid #e2e8f0}tr:nth-child(even) td{background:#fafbfc}.footer{margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8}';
+
+  let html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Resumen Ejecutivo ANID</title><style>'+CSS+'</style></head><body>';
+  html+='<div class="header"><div><div style="font-size:11px;opacity:0.7;margin-bottom:4px">ANID — Unidad de Tesorería</div><h1>Resumen Ejecutivo de Gestión de Pagos</h1><p style="font-size:11px;opacity:0.8;margin-top:3px">Plataforma de Control de Expedientes</p></div><div style="font-size:11px;opacity:0.7;text-align:right">'+hoy+'</div></div>';
+  html+='<div class="content">';
+
+  // KPIs
+  html+='<div class="section-title">📊 Indicadores Clave</div>';
+  html+='<div class="kpis">';
+  html+='<div class="kpi" style="border-top-color:'+semColor+';background:'+semColor+'22"><div class="kpi-val" style="color:'+semColor+'">'+pct+'%</div><div class="kpi-lbl">% Tramitado</div><div style="font-size:9px;color:#94a3b8;margin-top:2px">Meta: 90%</div></div>';
+  html+='<div class="kpi" style="border-top-color:#0033A0;background:#eff6ff"><div class="kpi-val" style="color:#0033A0">'+total+'</div><div class="kpi-lbl">Total Expedientes</div><div style="font-size:9px;color:#94a3b8;margin-top:2px">'+tramitados+' tram. / '+enProceso+' proceso</div></div>';
+  html+='<div class="kpi" style="border-top-color:#8b5cf6;background:#f5f3ff"><div class="kpi-val" style="color:#7c3aed">'+tiempoPromedio+' días</div><div class="kpi-lbl">Tiempo Promedio</div><div style="font-size:9px;color:#94a3b8;margin-top:2px">Meta: ≤7 días</div></div>';
+  html+='<div class="kpi" style="border-top-color:#10b981;background:#ecfdf5"><div class="kpi-val" style="color:#059669;font-size:16px">'+fmtM(montoTotal)+'</div><div class="kpi-lbl">Monto Total</div></div>';
+  html+='<div class="kpi" style="border-top-color:#ef4444;background:#fef2f2"><div class="kpi-val" style="color:#dc2626;font-size:16px">'+fmtM(montoRiesgo)+'</div><div class="kpi-lbl">Monto en Riesgo</div><div style="font-size:9px;color:#94a3b8;margin-top:2px">Sin tramitar</div></div>';
+  html+='<div class="kpi" style="border-top-color:#f59e0b;background:#fffbeb"><div class="kpi-val" style="color:#d97706">'+enProceso+'</div><div class="kpi-lbl">En Proceso</div></div>';
+  html+='</div>';
+
+  // Por mes
+  html+='<div class="section-title">📅 Resumen Mensual</div>';
+  html+='<table><thead><tr><th>Mes</th><th>Ingresados</th><th>Tramitados</th><th>En Proceso</th><th>% Avance</th><th>Monto</th></tr></thead><tbody>'+mesRows+'</tbody></table>';
+
+  // Por tipo de pago
+  html+='<div class="section-title pb">💳 Por Tipo de Pago</div>';
+  html+='<table><thead><tr><th>Tipo</th><th>Expedientes</th><th>Monto Total</th></tr></thead><tbody>'+tipoRows+'</tbody></table>';
+
+  // Por centro de costo
+  html+='<div class="section-title">🏢 Por Centro de Costo</div>';
+  html+='<table><thead><tr><th>Centro</th><th>Expedientes</th><th>Tramitados</th><th>En Proceso</th><th>% Avance</th><th>Monto</th></tr></thead><tbody>'+ccRows+'</tbody></table>';
+
+  // Por analista
+  html+='<div class="section-title pb">👤 Gestión por Analista</div>';
+  html+='<table><thead><tr><th>Analista</th><th>Expedientes</th><th>Tramitados</th><th>En Proceso</th><th>% Avance</th></tr></thead><tbody>'+anaRows+'</tbody></table>';
+
+  // Críticos
+  if(criticos.length>0){
+    html+='<div class="section-title">🔴 Expedientes Críticos (+10 días sin tramitar)</div>';
+    html+='<table><thead><tr><th>N° TED</th><th>Fecha Ingreso</th><th>Días Pendiente</th><th>Analista</th><th>Monto</th><th>Tipo Pago</th></tr></thead><tbody>'+criticosRows+'</tbody></table>';
+  }
+
+  // Rechazos sin solución
+  if(recSinSol.length>0){
+    html+='<div class="section-title pb">🏦 Rechazos Bancarios Sin Solución</div>';
+    html+='<table><thead><tr><th>RUT</th><th>Beneficiario</th><th>Subdirección</th><th>Tipo</th><th>Fecha</th></tr></thead><tbody>'+recRows+'</tbody></table>';
+    if(recSinSol.length>20) html+='<p style="font-size:11px;color:#64748b;margin-top:6px">* Se muestran los 20 más recientes de '+recSinSol.length+' total.</p>';
+  }
+
+  html+='<div class="footer">Generado el '+hoy+' &nbsp;|&nbsp; Plataforma de Gestión ANID &nbsp;|&nbsp; Developed By Marco Espinosa</div>';
+  html+='</div><script>window.onload=function(){window.print();}<\/script></body></html>';
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 // ── INIT ──
