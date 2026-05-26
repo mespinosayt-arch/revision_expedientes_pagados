@@ -617,9 +617,21 @@ function poblarFiltros(data){
   const analistas=[...new Set(data.map(d=>d.analista).filter(Boolean))].sort();
   const centros=[...new Set(data.map(d=>d.centro_costo).filter(Boolean))].sort();
   const tipos=[...new Set(data.map(d=>d.tipo_pago).filter(Boolean))].sort();
-  ['dash-mes','rep-mes'].forEach(id=>{ const el=document.getElementById(id); if(!el) return; meses.forEach(m=>{ const o=document.createElement('option'); o.value=m; const[y,mo]=m.split('-'); o.text=MESES[parseInt(mo)]+' '+y; el.appendChild(o); }); });
-  ['dash-analista','rep-analista'].forEach(id=>{ const el=document.getElementById(id); if(!el) return; analistas.forEach(a=>{ const o=document.createElement('option'); o.value=a; o.text=a; el.appendChild(o); }); });
-  ['dash-centro','rep-centro'].forEach(id=>{ const el=document.getElementById(id); if(!el) return; centros.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.text=c; el.appendChild(o); }); });
+
+  // Limpiar y repoblar — evita duplicados al navegar varias veces
+  const poblar = (ids, items, labelFn) => {
+    ids.forEach(id=>{ 
+      const el=document.getElementById(id); 
+      if(!el) return;
+      // Mantener solo la primera opción (Todos...)
+      while(el.options.length > 1) el.remove(1);
+      items.forEach(v=>{ const o=document.createElement('option'); o.value=v; o.text=labelFn?labelFn(v):v; el.appendChild(o); });
+    });
+  };
+
+  poblar(['dash-mes','rep-mes'], meses, m=>{ const[y,mo]=m.split('-'); return MESES[parseInt(mo)]+' '+y; });
+  poblar(['dash-analista','rep-analista'], analistas);
+  poblar(['dash-centro','rep-centro'], centros);
 }
 
 async function cargarDashboard(){
