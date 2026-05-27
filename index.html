@@ -909,10 +909,11 @@ async function buscarExpediente(){
     if(rechazos.length===0){
       recHTML='<div style="background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:bold;margin-bottom:12px;border-left:4px solid #10b981">✅ Sin rechazos bancarios</div>';
     } else {
-      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${r.beneficiario||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div>${(()=>{ const ceR=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
+      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${r.beneficiario||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div>${(()=>{ const saldoF2=parseFloat(r.saldo_final)||0;
+              const ceR=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
               const esCE2=ceR&&(/^CE\d+/i.test(ceR)||/^\d+$/.test(ceR));
-              const esNombre2=ceR&&!esCE2;
-              return ceR?`<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Comprobante Egreso</span><br><span style="background:${esCE2?'#dcfce7':esNombre2?'#fef3c7':'#f1f5f9'};color:${esCE2?'#166534':esNombre2?'#92400e':'#64748b'};padding:2px 8px;border-radius:6px;font-weight:bold">${esCE2?'✅ ':esNombre2?'⏳ Pendiente':''}${esCE2?ceR:''}</span></div>`:''; })()}</div></div>`).join('')}</div>`;
+              const sol2=saldoF2===0&&esCE2;
+              return `<div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Estado Rechazo</span><br><span style="background:${sol2?'#dcfce7':saldoF2===0?'#dcfce7':'#fef3c7'};color:${sol2?'#166534':saldoF2===0?'#166534':'#92400e'};padding:2px 8px;border-radius:6px;font-weight:bold">${sol2?'✅ '+ceR:saldoF2===0?'✅ Solucionado':'⏳ Pendiente ($'+Math.round(saldoF2).toLocaleString('es-CL')+')'}</span></div>`; })()}</div></div>`).join('')}</div>`;
     }
     const lTED = t => { if(!t) return '-'; const m=String(t).match(/^E\d+/i); return m?m[0]:String(t); };
 
@@ -980,8 +981,12 @@ async function buscarPorRutOFolio(tipo){
     // tedsUnicos ahora son las bases (sin letras)
     const tedsUnicos=tedsBase;
     for(const rut of rutsUnicos){
-      const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(1);
-      if(recRes2.data&&recRes2.data.length>0) recPorRut[rut]=recRes2.data[0];
+      const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(5);
+      if(recRes2.data&&recRes2.data.length>0){
+        // Preferir el registro más reciente del último mes cargado
+        const ultimo = recRes2.data[0];
+        recPorRut[rut] = ultimo;
+      }
     }
     const fmtM2=v=>'$'+Math.round(parseFloat(v)||0).toLocaleString('es-CL');
     // Obtener nombre desde beneficiarios
@@ -1029,15 +1034,16 @@ async function buscarPorRutOFolio(tipo){
           } else {
               html+=`<div style="background:#fef2f2;border-radius:8px;padding:10px 12px;margin-bottom:10px;border-left:3px solid #ef4444"><div style="color:#991b1b;font-size:13px;font-weight:bold;margin-bottom:6px">⚠️ ${rechazosDelTed.length} rechazo(s)</div>`;
             rechazosDelTed.forEach(r=>{
+              const saldoF = parseFloat(r.saldo_final)||0;
               const ceRaw=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
-              // Si el valor parece un nombre (tiene espacios o es solo letras) → Pendiente
               const esCE = ceRaw && (/^CE\d+/i.test(ceRaw) || /^\d+$/.test(ceRaw));
-              const esNombre = ceRaw && !esCE;
-              const ceTag = esCE
-                ? ` — <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">✅ ${ceRaw}</span>`
-                : esNombre
-                  ? ` — <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">⏳ Pendiente</span>`
-                  : ' — <span style="color:#94a3b8;font-size:11px">Sin CE</span>';
+              // Solucionado si saldo_final es 0 Y tiene CE
+              const solucionado = saldoF===0 && esCE;
+              const ceTag = solucionado
+                ? ' — <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">✅ '+ceRaw+'</span>'
+                : saldoF===0 && !esCE
+                  ? ' — <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">✅ Solucionado</span>'
+                  : ' — <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">⏳ Pendiente ($'+Math.round(saldoF).toLocaleString('es-CL')+')</span>';
               html+=`<div style="font-size:12px;color:#64748b;margin-bottom:3px">${fmtF(r.fecha)} — ${r.beneficiario||''} — ${r.rut||''} — Cta: ${r.cuenta_corriente||''}${ceTag}</div>`;
             });
             html+=`</div>`;
@@ -1136,6 +1142,13 @@ async function leerExcelRechazos(file){
           'N° Documento Solución':'numero_doc_solucion','N° doc. Solución':'numero_doc_solucion',
           'AÑO':'anio','Año':'anio','ANIO':'anio'
         };
+        // Mapeo dinámico para columnas con fechas variables (SALDO FINAL AL ...)
+        const mapKeysDynamic = (k) => {
+          const kt = k.trim().toUpperCase();
+          if(kt.startsWith('SALDO FINAL')) return 'saldo_final';
+          if(kt.startsWith('SALDO INICIAL')) return null; // ignorar
+          return null;
+        };
         // Hojas válidas: solo meses (ignorar AUXILIARES, CC, etc.)
         const hojasValidas = wb.SheetNames.filter(n=>
           /enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre/i.test(n)
@@ -1151,7 +1164,7 @@ async function leerExcelRechazos(file){
             const obj={};
             Object.keys(row).forEach(k=>{
               if(!k||k.startsWith('__')||k.trim()==='') return;
-              const nk=mapKeys[k.trim()]||null;
+              const nk=mapKeys[k.trim()]||mapKeysDynamic(k)||null;
               if(!nk) return;
               let v=row[k];
               // Formatear fechas
@@ -1310,7 +1323,7 @@ async function exportarPDF(){
   const {data:recData}=await sb.from('rechazos').select('rut,beneficiario,subdireccion,tipo_transferencia,fecha,numero_doc_solucion').order('fecha',{ascending:false}).limit(200);
   const latestRec={};
   (recData||[]).forEach(r=>{ const k=r.rut||r.beneficiario; if(!latestRec[k]) latestRec[k]=r; });
-  const recSinSol=Object.values(latestRec).filter(r=>{ const ce=r.numero_doc_solucion; return !ce||String(ce).toLowerCase()==='null'||String(ce).toLowerCase()==='empty'||String(ce).trim()===''; });
+  const recSinSol=Object.values(latestRec).filter(r=>{ const sf=parseFloat(r.saldo_final)||0; return sf > 0; });
   const recRows=recSinSol.slice(0,20).map(r=>'<tr><td>'+r.rut+'</td><td>'+(r.beneficiario||'-')+'</td><td>'+(r.subdireccion||'-')+'</td><td>'+(r.tipo_transferencia||'-')+'</td><td>'+fmtF(r.fecha)+'</td></tr>').join('');
 
   const CSS = 'body{font-family:Segoe UI,Arial,sans-serif;color:#1f2937;font-size:13px}@page{margin:15mm}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}.pb{page-break-before:always}.header{background:linear-gradient(135deg,#0033A0,#002171);color:white;padding:22px 28px;display:flex;justify-content:space-between;align-items:center;border-radius:0 0 12px 12px;margin-bottom:20px}.header h1{font-size:20px;font-weight:800}.content{padding:0 8px}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}.kpi{border-radius:10px;padding:14px;text-align:center;border-top:4px solid #0033A0}.kpi-val{font-size:22px;font-weight:800;margin-bottom:3px}.kpi-lbl{font-size:10px;text-transform:uppercase;color:#64748b;font-weight:600}.section-title{font-size:14px;font-weight:800;color:#0033A0;margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #eef2f7}table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:4px}th{background:#f8fafc;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;color:#64748b;border:1px solid #e2e8f0}td{padding:7px 10px;border:1px solid #e2e8f0}tr:nth-child(even) td{background:#fafbfc}.footer{margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;text-align:center;font-size:10px;color:#94a3b8}';
