@@ -1119,22 +1119,26 @@ async function leerExcelRechazos(file){
         const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
         const mapKeys={
           'pp':'pp',
-          'Cuenta Corriente':'cuenta_corriente',
-          'FECHA ':'fecha','FECHA':'fecha',
-          'RUT':'rut',
-          'BENEFICIARIO':'beneficiario',
-          'CONCEPTO':'concepto',
-          'Tipo':'tipo',
-          'COMP':'comp',
-          'Debitos':'debitos','Débitos':'debitos',
-          'Creditos':'creditos','Créditos':'creditos',
-          'SUBDIRECCIÓN':'subdireccion','Subdirección':'subdireccion','SUBDIRECCION':'subdireccion',
-          'TED Pago':'ted_pago',
-          'Tipo de transferencia':'tipo_transferencia',
-          'OBSERVACION UT':'observacion_ut','Observación UT':'observacion_ut',
-          'OBSERVACION':'observacion','Observación':'observacion',
-          'N° Documento Solución':'numero_doc_solucion','N° doc. Solución':'numero_doc_solucion',
-          'AÑO':'anio','Año':'anio','ANIO':'anio'
+  'Cuenta Corriente':'cuenta_corriente',
+  'FECHA ':'fecha','FECHA':'fecha',
+  'RUT':'rut',
+  'BENEFICIARIO':'beneficiario',
+  'CONCEPTO':'concepto',
+  'Tipo':'tipo',
+  'COMP':'comp',
+  'Debitos':'debitos','Débitos':'debitos',
+  'Creditos':'creditos','Créditos':'creditos',
+  'SUBDIRECCIÓN':'subdireccion','Subdirección':'subdireccion','SUBDIRECCION':'subdireccion',
+  'TED Pago':'ted_pago',
+  'Tipo de transferencia':'tipo_transferencia',
+  'OBSERVACION UT':'observacion_ut','Observación UT':'observacion_ut',
+  'OBSERVACION':'observacion','Observación':'observacion',
+  'N° Documento Solución':'numero_doc_solucion','N° doc. Solución':'numero_doc_solucion',
+
+  'Saldo Final':'saldo_final',
+  'SALDO FINAL':'saldo_final',
+
+  'AÑO':'anio','Año':'anio','ANIO':'anio'
         };
         // Hojas válidas: solo meses (ignorar AUXILIARES, CC, etc.)
         const hojasValidas = wb.SheetNames.filter(n=>
