@@ -1167,7 +1167,10 @@ async function leerExcelRechazos(file){
               // Ignorar fórmulas VLOOKUP
               if(typeof v==='string'&&v.startsWith('=')) return;
               if(nk==='saldo_final' || nk==='creditos' || nk==='debitos'){
-  obj[nk]=v!=null && v!=='' ? Number(v) : null;
+ if(k.toUpperCase().includes('SALDO FINAL AL')){
+  obj['saldo_final'] = v!=null && v!=='' ? Number(v) : null;
+}                         
+                obj[nk]=v!=null && v!=='' ? Number(v) : null;
 }else{
   obj[nk]=v!=null ? String(v).trim() || null : null;
 }
