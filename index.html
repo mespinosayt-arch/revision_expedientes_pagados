@@ -1154,10 +1154,17 @@ async function leerExcelRechazos(file){
           const mapped=json.map(row=>{
             const obj={};
             Object.keys(row).forEach(k=>{
-              if(!k||k.startsWith('__')||k.trim()==='') return;
-              const nk=mapKeys[k.trim()]||null;
-              if(!nk) return;
-              let v=row[k];
+  if(!k||k.startsWith('__')||k.trim()==='') return;
+
+  let v=row[k];
+
+  // Detectar columnas dinámicas SALDO FINAL AL XX.XX.XXXX
+  if(k.toUpperCase().includes('SALDO FINAL AL')){
+    obj['saldo_final'] = v!=null && v!=='' ? Number(v) : null;
+  }
+
+  const nk=mapKeys[k.trim()]||null;
+  if(!nk) return;
               // Formatear fechas
               if(v instanceof Date){
                 v=`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
@@ -1166,10 +1173,7 @@ async function leerExcelRechazos(file){
               }
               // Ignorar fórmulas VLOOKUP
               if(typeof v==='string'&&v.startsWith('=')) return;
-              if(nk==='saldo_final' || nk==='creditos' || nk==='debitos'){
- if(k.toUpperCase().includes('SALDO FINAL AL')){
-  obj['saldo_final'] = v!=null && v!=='' ? Number(v) : null;
-}                         
+              if(nk==='saldo_final' || nk==='creditos' || nk==='debitos'){                       
                 obj[nk]=v!=null && v!=='' ? Number(v) : null;
 }else{
   obj[nk]=v!=null ? String(v).trim() || null : null;
