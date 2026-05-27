@@ -1166,7 +1166,11 @@ async function leerExcelRechazos(file){
               }
               // Ignorar fórmulas VLOOKUP
               if(typeof v==='string'&&v.startsWith('=')) return;
-              obj[nk]=v!=null?String(v).trim()||null:null;
+              if(nk==='saldo_final' || nk==='creditos' || nk==='debitos'){
+  obj[nk]=v!=null && v!=='' ? Number(v) : null;
+}else{
+  obj[nk]=v!=null ? String(v).trim() || null : null;
+}
             });
             return obj;
           }).filter(row=>row.rut&&row.rut.trim()!==''); // Solo filas con RUT
