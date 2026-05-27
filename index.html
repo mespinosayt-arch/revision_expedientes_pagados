@@ -1119,26 +1119,22 @@ async function leerExcelRechazos(file){
         const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
         const mapKeys={
           'pp':'pp',
-  'Cuenta Corriente':'cuenta_corriente',
-  'FECHA ':'fecha','FECHA':'fecha',
-  'RUT':'rut',
-  'BENEFICIARIO':'beneficiario',
-  'CONCEPTO':'concepto',
-  'Tipo':'tipo',
-  'COMP':'comp',
-  'Debitos':'debitos','Débitos':'debitos',
-  'Creditos':'creditos','Créditos':'creditos',
-  'SUBDIRECCIÓN':'subdireccion','Subdirección':'subdireccion','SUBDIRECCION':'subdireccion',
-  'TED Pago':'ted_pago',
-  'Tipo de transferencia':'tipo_transferencia',
-  'OBSERVACION UT':'observacion_ut','Observación UT':'observacion_ut',
-  'OBSERVACION':'observacion','Observación':'observacion',
-  'N° Documento Solución':'numero_doc_solucion','N° doc. Solución':'numero_doc_solucion',
-
-  'Saldo Final':'saldo_final',
-  'SALDO FINAL':'saldo_final',
-
-  'AÑO':'anio','Año':'anio','ANIO':'anio'
+          'Cuenta Corriente':'cuenta_corriente',
+          'FECHA ':'fecha','FECHA':'fecha',
+          'RUT':'rut',
+          'BENEFICIARIO':'beneficiario',
+          'CONCEPTO':'concepto',
+          'Tipo':'tipo',
+          'COMP':'comp',
+          'Debitos':'debitos','Débitos':'debitos',
+          'Creditos':'creditos','Créditos':'creditos',
+          'SUBDIRECCIÓN':'subdireccion','Subdirección':'subdireccion','SUBDIRECCION':'subdireccion',
+          'TED Pago':'ted_pago',
+          'Tipo de transferencia':'tipo_transferencia',
+          'OBSERVACION UT':'observacion_ut','Observación UT':'observacion_ut',
+          'OBSERVACION':'observacion','Observación':'observacion',
+          'N° Documento Solución':'numero_doc_solucion','N° doc. Solución':'numero_doc_solucion',
+          'AÑO':'anio','Año':'anio','ANIO':'anio'
         };
         // Hojas válidas: solo meses (ignorar AUXILIARES, CC, etc.)
         const hojasValidas = wb.SheetNames.filter(n=>
@@ -1154,17 +1150,10 @@ async function leerExcelRechazos(file){
           const mapped=json.map(row=>{
             const obj={};
             Object.keys(row).forEach(k=>{
-  if(!k||k.startsWith('__')||k.trim()==='') return;
-
-  let v=row[k];
-
-  // Detectar columnas dinámicas SALDO FINAL AL XX.XX.XXXX
-  if(k.toUpperCase().includes('SALDO FINAL AL')){
-    obj['saldo_final'] = v!=null && v!=='' ? Number(v) : null;
-  }
-
-  const nk=mapKeys[k.trim()]||null;
-  if(!nk) return;
+              if(!k||k.startsWith('__')||k.trim()==='') return;
+              const nk=mapKeys[k.trim()]||null;
+              if(!nk) return;
+              let v=row[k];
               // Formatear fechas
               if(v instanceof Date){
                 v=`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
@@ -1173,15 +1162,7 @@ async function leerExcelRechazos(file){
               }
               // Ignorar fórmulas VLOOKUP
               if(typeof v==='string'&&v.startsWith('=')) return;
-              if(nk==='creditos' || nk==='debitos'){
-  obj[nk]=v!=null && v!=='' ? Number(v) : null;
-}
-              if(!obj.saldo_final){
-  obj.saldo_final = null;
-}
-}else{
-  obj[nk]=v!=null ? String(v).trim() || null : null;
-}
+              obj[nk]=v!=null?String(v).trim()||null:null;
             });
             return obj;
           }).filter(row=>row.rut&&row.rut.trim()!==''); // Solo filas con RUT
