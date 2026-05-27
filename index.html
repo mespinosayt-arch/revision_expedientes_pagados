@@ -885,12 +885,11 @@ async function buscarExpediente(){
     const tramitado=fmtV(d.numero_nomina)&&fmtV(d.fecha_pago);
     const todosRec=recRes.data||[];
     const fechaIng2 = d.fecha_ingreso ? new Date(d.fecha_ingreso) : null;
-    const fechaPago2 = d.fecha_pago ? new Date(d.fecha_pago) : new Date();
-    // Solo rechazos dentro del rango del expediente
+    // Rechazos desde la fecha de ingreso en adelante (sin límite superior)
     const recFiltrados = todosRec.filter(r=>{
       if(!fechaIng2) return true;
       const fr = new Date(r.fecha);
-      return fr >= fechaIng2 && fr <= fechaPago2;
+      return fr >= fechaIng2;
     });
     const latestMap={};
     recFiltrados.forEach(r=>{ const k=r.rut||r.beneficiario||Math.random(); if(!latestMap[k]||r.fecha>latestMap[k].fecha) latestMap[k]=r; });
@@ -1016,12 +1015,11 @@ async function buscarPorRutOFolio(tipo){
         const rutsDeTed=[...new Set(filas.filter(f=>variantes.includes(String(f.nro_ref||'').trim())).map(f=>String(f.rut||'').trim()).filter(r=>r))];
         // Filtrar rechazos por fecha: solo los que ocurrieron entre fecha_ingreso y fecha_pago del expediente
         const fechaIng = exp?.fecha_ingreso ? new Date(exp.fecha_ingreso) : null;
-        const fechaPago = exp?.fecha_pago ? new Date(exp.fecha_pago) : new Date();
         const rechazosDelTed=rutsDeTed.map(r=>recPorRut[r]).filter(rec=>{
           if(!rec) return false;
-          if(!fechaIng) return true; // si no hay fecha ingreso, mostrar igual
+          if(!fechaIng) return true;
           const fechaRec = new Date(rec.fecha);
-          return fechaRec >= fechaIng && fechaRec <= fechaPago;
+          return fechaRec >= fechaIng;
         });
         html+=`<div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--azul)">`;
         const ceExp = exp?.comprobante_egreso ? String(exp.comprobante_egreso).trim() : null;
