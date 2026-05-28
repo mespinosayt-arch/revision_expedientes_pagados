@@ -632,6 +632,7 @@ function poblarFiltros(data){
   poblar(['dash-mes','rep-mes'], meses, m=>{ const[y,mo]=m.split('-'); return MESES[parseInt(mo)]+' '+y; });
   poblar(['dash-analista','rep-analista'], analistas);
   poblar(['dash-centro','rep-centro'], centros);
+  poblar(['dash-tipo'], tipos);
 }
 
 async function cargarDashboard(){
@@ -1381,6 +1382,3 @@ async function exportarPDF(){
 // ── INIT ──
 sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
 sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
-</script>
-</body>
-</html>
