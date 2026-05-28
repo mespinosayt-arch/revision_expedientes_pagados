@@ -1382,3 +1382,6 @@ async function exportarPDF(){
 // ── INIT ──
 sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
 sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
+</script>
+</body>
+</html>
