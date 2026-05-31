@@ -632,7 +632,6 @@ function poblarFiltros(data){
   poblar(['dash-mes','rep-mes'], meses, m=>{ const[y,mo]=m.split('-'); return MESES[parseInt(mo)]+' '+y; });
   poblar(['dash-analista','rep-analista'], analistas);
   poblar(['dash-centro','rep-centro'], centros);
-  poblar(['dash-tipo'], tipos);
 }
 
 async function cargarDashboard(){
