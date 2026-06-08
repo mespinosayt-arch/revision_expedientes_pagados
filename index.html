@@ -892,7 +892,13 @@ async function buscarExpediente(){
       return fr >= fechaIng2;
     });
     const latestMap={};
-    recFiltrados.forEach(r=>{ const k=r.rut||r.beneficiario||Math.random(); if(!latestMap[k]||r.fecha>latestMap[k].fecha) latestMap[k]=r; });
+    recFiltrados.forEach(r=>{ 
+      const k=r.rut||r.beneficiario||Math.random(); 
+      const sf = parseFloat(r.saldo_final)||0;
+      const existingSf = latestMap[k] ? (parseFloat(latestMap[k].saldo_final)||0) : Infinity;
+      // Preferir registro solucionado (saldo_final=0), si no el más reciente
+      if(!latestMap[k] || (sf===0 && existingSf>0) || (sf===existingSf && r.fecha>latestMap[k].fecha)) latestMap[k]=r; 
+    });
     const rechazos=Object.values(latestMap);
     const campo=(key,label,cls='')=>{
       const val=key==='fecha_ingreso'||key==='fecha_pago'||key==='fecha_nomina'?fmtF(d[key]):fmtV(d[key]);
@@ -980,11 +986,16 @@ async function buscarPorRutOFolio(tipo){
     // tedsUnicos ahora son las bases (sin letras)
     const tedsUnicos=tedsBase;
     for(const rut of rutsUnicos){
-      const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(5);
+      const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(20);
       if(recRes2.data&&recRes2.data.length>0){
-        // Preferir el registro más reciente del último mes cargado
-        const ultimo = recRes2.data[0];
-        recPorRut[rut] = ultimo;
+        // Preferir el registro solucionado (saldo_final=0) si existe
+        const solucionado = recRes2.data.find(r=>(parseFloat(r.saldo_final)||0)===0 && r.numero_doc_solucion && /^CE\d+/i.test(String(r.numero_doc_solucion).trim()));
+        recPorRut[rut] = solucionado || recRes2.data.reduce((best, r) => {
+          // Si no hay solucionado, tomar el de menor saldo_final
+          const sf = parseFloat(r.saldo_final) || 0;
+          const bestSf = parseFloat(best.saldo_final) || 0;
+          return sf < bestSf ? r : best;
+        }, recRes2.data[0]);
       }
     }
     const fmtM2=v=>'$'+Math.round(parseFloat(v)||0).toLocaleString('es-CL');
