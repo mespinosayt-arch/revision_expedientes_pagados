@@ -988,14 +988,8 @@ async function buscarPorRutOFolio(tipo){
     for(const rut of rutsUnicos){
       const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(20);
       if(recRes2.data&&recRes2.data.length>0){
-        // Preferir el registro solucionado (saldo_final=0) si existe
-        const solucionado = recRes2.data.find(r=>(parseFloat(r.saldo_final)||0)===0 && r.numero_doc_solucion && /^CE\d+/i.test(String(r.numero_doc_solucion).trim()));
-        recPorRut[rut] = solucionado || recRes2.data.reduce((best, r) => {
-          // Si no hay solucionado, tomar el de menor saldo_final
-          const sf = parseFloat(r.saldo_final) || 0;
-          const bestSf = parseFloat(best.saldo_final) || 0;
-          return sf < bestSf ? r : best;
-        }, recRes2.data[0]);
+        // Guardar TODOS los rechazos del RUT para filtrar por TED después
+        recPorRut[rut] = recRes2.data;
       }
     }
     const fmtM2=v=>'$'+Math.round(parseFloat(v)||0).toLocaleString('es-CL');
@@ -1026,23 +1020,33 @@ async function buscarPorRutOFolio(tipo){
         const rutsDeTed=[...new Set(filas.filter(f=>variantes.includes(String(f.nro_ref||'').trim())).map(f=>String(f.rut||'').trim()).filter(r=>r))];
         // Filtrar rechazos por fecha: solo los que ocurrieron entre fecha_ingreso y fecha_pago del expediente
         const fechaIng = exp?.fecha_ingreso ? new Date(exp.fecha_ingreso) : null;
-        const rechazosDelTed=rutsDeTed.map(r=>recPorRut[r]).filter(rec=>{
-          if(!rec) return false;
+        const rechazosDelTed=rutsDeTed.flatMap(r=>recPorRut[r]||[]).filter(rec=>{
+          // Solo mostrar rechazo si su ted_pago coincide con este TED
+          const recTed = rec.ted_pago ? String(rec.ted_pago).trim().toUpperCase().match(/^E\d+/i) : null;
+          const tedClean = tedNum.toUpperCase();
+          if(recTed && recTed[0] !== tedClean) return false;
           if(!fechaIng) return true;
           const fechaRec = new Date(rec.fecha);
           return fechaRec >= fechaIng;
         });
+        // De los rechazos filtrados, preferir el solucionado
+        const recFinal = [];
+        const recVisto = {};
+        rechazosDelTed.forEach(r=>{
+          const k = r.rut||r.beneficiario;
+          const sf = parseFloat(r.saldo_final)||0;
+          if(!recVisto[k] || (sf===0 && parseFloat(recVisto[k].saldo_final||0)>0)) { recVisto[k]=r; }
+        });
+        Object.values(recVisto).forEach(r=>recFinal.push(r));
         html+=`<div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:12px;border-left:4px solid var(--azul)">`;
         const ceExp = exp?.comprobante_egreso ? String(exp.comprobante_egreso).trim() : null;
         const ceLabel = ceExp && ceExp!=='0' ? ` <span style="background:#dcfce7;color:#166534;font-size:12px;padding:2px 10px;border-radius:8px;font-weight:700;text-transform:none">📄 CE${ceExp}</span>` : '';
         html+=`<div style="font-size:13px;font-weight:800;color:var(--azul);margin-bottom:10px;text-transform:uppercase;display:flex;align-items:center;gap:8px;flex-wrap:wrap">📋 TED: ${tedNum}${variantesLabel}${ceLabel}</div>`;
         if(exp){
           html+=`<div class="estado-badge ${tram?'tramitado':'en-proceso'} "style="margin-bottom:10px;font-size:13px">${tram?'✅ TRAMITADO':'⏳ EN PROCESO'}</div>`;
-          if(rechazosDelTed.length===0){
-            html+=`<div style="background:#ecfdf5;color:#065f46;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:bold;margin-bottom:10px;border-left:3px solid #10b981">✅ Sin rechazos bancarios</div>`;
-          } else {
-              html+=`<div style="background:#fef2f2;border-radius:8px;padding:10px 12px;margin-bottom:10px;border-left:3px solid #ef4444"><div style="color:#991b1b;font-size:13px;font-weight:bold;margin-bottom:6px">⚠️ ${rechazosDelTed.length} rechazo(s)</div>`;
-            rechazosDelTed.forEach(r=>{
+          if(recFinal.length>0){
+              html+=`<div style="background:#fef2f2;border-radius:8px;padding:10px 12px;margin-bottom:10px;border-left:3px solid #ef4444"><div style="color:#991b1b;font-size:13px;font-weight:bold;margin-bottom:6px">⚠️ ${recFinal.length} rechazo(s)</div>`;
+            recFinal.forEach(r=>{
               const saldoF = parseFloat(r.saldo_final)||0;
               const ceRaw=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
               const esCE = ceRaw && (/^CE\d+/i.test(ceRaw) || /^\d+$/.test(ceRaw));
