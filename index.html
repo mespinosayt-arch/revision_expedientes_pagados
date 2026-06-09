@@ -1021,13 +1021,11 @@ async function buscarPorRutOFolio(tipo){
         // Filtrar rechazos por fecha: solo los que ocurrieron entre fecha_ingreso y fecha_pago del expediente
         const fechaIng = exp?.fecha_ingreso ? new Date(exp.fecha_ingreso) : null;
         const rechazosDelTed=rutsDeTed.flatMap(r=>recPorRut[r]||[]).filter(rec=>{
-          // Solo mostrar rechazo si su ted_pago coincide con este TED
+          // Solo incluir si ted_pago coincide con este TED
           const recTed = rec.ted_pago ? String(rec.ted_pago).trim().toUpperCase().match(/^E\d+/i) : null;
+          if(!recTed) return false; // sin ted_pago no se puede asociar
           const tedClean = tedNum.toUpperCase();
-          if(recTed && recTed[0] !== tedClean) return false;
-          if(!fechaIng) return true;
-          const fechaRec = new Date(rec.fecha);
-          return fechaRec >= fechaIng;
+          return recTed[0] === tedClean;
         });
         // De los rechazos filtrados, preferir el solucionado
         const recFinal = [];
