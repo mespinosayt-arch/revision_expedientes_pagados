@@ -712,8 +712,13 @@ function renderDashboard(data){
 
   // Por tipo (count)
   const porTipo={};
-  data.forEach(d=>{ const t=d.tipo_pago||'Sin tipo'; if(!porTipo[t]) porTipo[t]=0; porTipo[t]++; });
-  const tiposOrd=Object.keys(porTipo).sort((a,b)=>porTipo[b]-porTipo[a]);
+  data.forEach(d=>{ 
+    const t=d.tipo_pago||'Sin tipo'; 
+    if(!porTipo[t]) porTipo[t]={exp:0,ben:0}; 
+    porTipo[t].exp++; 
+    porTipo[t].ben += parseInt(d.numero_beneficiarios)||0; 
+  });
+  const tiposOrd=Object.keys(porTipo).sort((a,b)=>porTipo[b].exp-porTipo[a].exp);
 
   // Aging
   const aging={'0-5 días':0,'6-10 días':0,'11-20 días':0,'+20 días':0};
@@ -733,7 +738,8 @@ function renderDashboard(data){
 
   setTimeout(()=>{
     renderChart('mes','📅 Monto por Mes',mesLabels,mesesOrd.map(m=>porMes[m].monto),'#0033A0',true,true);
-    renderChart('tipo','💳 Expedientes por Tipo',tiposOrd,tiposOrd.map(t=>porTipo[t]),'#f59e0b',false,false);
+    const tipoInfo=tiposOrd.map(t=>porTipo[t].exp+' exp · '+porTipo[t].ben.toLocaleString('es-CL')+' ben');
+    renderChart('tipo','💳 Pagos por Tipo de Expediente',tiposOrd,tiposOrd.map(t=>porTipo[t].exp),'#f59e0b',false,false,tipoInfo);
     renderChart('aging','📊 Aging — Días Sin Tramitar',Object.keys(aging),Object.values(aging),'#ef4444',false,false);
     renderChart('ana','👤 Expedientes por Analista',anasOrd,anasOrd.map(a=>porAna[a].total),'#8b5cf6',false,false);
   },80);
@@ -891,8 +897,11 @@ function renderGraficosRechazos(){
   const nuevo=()=>({teds:new Set(),ruts:new Set()});
   const porMesR={},porTipoR={},porSubR={};
   data.forEach(d=>{
-    const ted=d.ted_pago?String(d.ted_pago).trim():null;
-    const rut=d.rut?String(d.rut).trim():null;
+    // Normalizar TED: extraer solo E+números, uppercase (E9274/2023 → E9274)
+    let ted=null;
+    if(d.ted_pago){ const m=String(d.ted_pago).trim().toUpperCase().match(/E\s*(\d+)/); if(m) ted='E'+m[1]; }
+    // Normalizar RUT: sin puntos, uppercase
+    const rut=d.rut?String(d.rut).trim().toUpperCase().replace(/\./g,''):null;
     const m=d.fecha?.slice(0,7)||'Sin fecha'; if(!porMesR[m]) porMesR[m]=nuevo(); if(ted)porMesR[m].teds.add(ted); if(rut)porMesR[m].ruts.add(rut);
     const t=d.tipo_transferencia||'Sin tipo'; if(!porTipoR[t]) porTipoR[t]=nuevo(); if(ted)porTipoR[t].teds.add(ted); if(rut)porTipoR[t].ruts.add(rut);
     const s=d.subdireccion||'Sin subdirección'; if(!porSubR[s]) porSubR[s]=nuevo(); if(ted)porSubR[s].teds.add(ted); if(rut)porSubR[s].ruts.add(rut);
@@ -1466,70 +1475,9 @@ async function exportarPDF(){
   w.document.close();
 }
 
-
 // ── INIT ──
-
-sb.auth.onAuthStateChange((event, session) => {
-  if (session?.user) {
-    mostrarApp(session.user);
-    setTimeout(() => cargarKPI(), 200);
-  } else {
-    mostrarAuth();
-  }
-});
-
-// solo una vez al cargar la página
-sb.auth.getSession().then(({ data: { session } }) => {
-  if (session?.user) {
-    mostrarApp(session.user);
-    setTimeout(() => cargarKPI(), 200);
-  } else {
-    mostrarAuth();
-  }
-});
-
-
-// ── KPI DASHBOARD ──
-async function cargarKPI(tipo = null) {
-  try {
-    const res = await fetch(
-      "https://TU-PROYECTO.supabase.co/rest/v1/rpc/dashboard_kpi",
-      {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ tipo })
-      }
-    );
-
-    // si Supabase falla, no rompe el dashboard
-    if (!res.ok) {
-      console.error("Error Supabase KPI:", await res.text());
-      return;
-    }
-
-    const data = await res.json();
-
-    if (!Array.isArray(data) || data.length === 0) return;
-
-    const kpi = data[0];
-
-    const exp = document.getElementById("expedientes");
-    const ben = document.getElementById("beneficiarios");
-
-    if (exp) exp.innerText = kpi.total_expedientes ?? 0;
-    if (ben) ben.innerText = kpi.total_beneficiarios ?? 0;
-
-  } catch (error) {
-    console.error("Error cargando KPI:", error);
-  }
-}
-function iniciarSesion() {
-  console.log("Login ejecutado");
-}
+sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
+sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
 </script>
 </body>
 </html>
