@@ -1466,30 +1466,74 @@ async function exportarPDF(){
   w.document.close();
 }
 
+/
 // ── INIT ──
-sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); cargarKPI(); else mostrarAuth(); });
-sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
+sb.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    mostrarApp(session.user);
+
+    // esperar a que el DOM esté listo
+    setTimeout(() => {
+      cargarKPI();
+    }, 200);
+
+  } else {
+    mostrarAuth();
+  }
+});
+
+sb.auth.getSession().then(({ data: { session } }) => {
+  if (session?.user) {
+    mostrarApp(session.user);
+
+    setTimeout(() => {
+      cargarKPI();
+    }, 200);
+
+  } else {
+    mostrarAuth();
+  }
+});
+
+
+// ── KPI DASHBOARD ──
 async function cargarKPI(tipo = null) {
-  const res = await fetch(
-    "https://TU-PROYECTO.supabase.co/rest/v1/rpc/dashboard_kpi",
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ tipo })
+  try {
+    const res = await fetch(
+      "https://TU-PROYECTO.supabase.co/rest/v1/rpc/dashboard_kpi",
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ tipo })
+      }
+    );
+
+    // si Supabase falla, no rompe el dashboard
+    if (!res.ok) {
+      console.error("Error Supabase KPI:", await res.text());
+      return;
     }
-  );
 
-  const data = await res.json();
+    const data = await res.json();
 
-  document.getElementById("expedientes").innerText =
-    data[0]?.total_expedientes ?? 0;
+    if (!Array.isArray(data) || data.length === 0) return;
 
-  document.getElementById("beneficiarios").innerText =
-    data[0]?.total_beneficiarios ?? 0;}
+    const kpi = data[0];
+
+    const exp = document.getElementById("expedientes");
+    const ben = document.getElementById("beneficiarios");
+
+    if (exp) exp.innerText = kpi.total_expedientes ?? 0;
+    if (ben) ben.innerText = kpi.total_beneficiarios ?? 0;
+
+  } catch (error) {
+    console.error("Error cargando KPI:", error);
+  }
+}
 </script>
 </body>
 </html>
