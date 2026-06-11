@@ -1466,30 +1466,23 @@ async function exportarPDF(){
   w.document.close();
 }
 
-/
+
 // ── INIT ──
+
 sb.auth.onAuthStateChange((event, session) => {
   if (session?.user) {
     mostrarApp(session.user);
-
-    // esperar a que el DOM esté listo
-    setTimeout(() => {
-      cargarKPI();
-    }, 200);
-
+    setTimeout(() => cargarKPI(), 200);
   } else {
     mostrarAuth();
   }
 });
 
+// solo una vez al cargar la página
 sb.auth.getSession().then(({ data: { session } }) => {
   if (session?.user) {
     mostrarApp(session.user);
-
-    setTimeout(() => {
-      cargarKPI();
-    }, 200);
-
+    setTimeout(() => cargarKPI(), 200);
   } else {
     mostrarAuth();
   }
@@ -1534,7 +1527,7 @@ async function cargarKPI(tipo = null) {
     console.error("Error cargando KPI:", error);
   }
 }
-  function iniciarSesion() {
+function iniciarSesion() {
   console.log("Login ejecutado");
 }
 </script>
