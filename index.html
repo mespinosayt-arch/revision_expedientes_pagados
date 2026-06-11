@@ -1467,8 +1467,8 @@ async function exportarPDF(){
 }
 
 // ── INIT ──
-sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
-sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user);cargarKPI(); else mostrarAuth(); });
+sb.auth.onAuthStateChange((event,session)=>{ if(session?.user) mostrarApp(session.user); cargarKPI(); else mostrarAuth(); });
+sb.auth.getSession().then(({data:{session}})=>{ if(session?.user) mostrarApp(session.user); else mostrarAuth(); });
 async function cargarKPI(tipo = null) {
   const res = await fetch(
     "https://TU-PROYECTO.supabase.co/rest/v1/rpc/dashboard_kpi",
