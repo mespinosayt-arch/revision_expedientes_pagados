@@ -167,6 +167,8 @@ table.tbl tr:hover td{ background:#fafbfc; }
 .chart-select{ padding:5px 10px; border:2px solid var(--borde); border-radius:8px; font-size:12px; background:white; cursor:pointer; }
 .chart-canvas-wrap{ position:relative; width:100%; height:260px; }
 
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
 /* ══ DASHBOARD EJECUTIVO ══ */
 .kpi-semaforo{ border-top-width:6px !important; position:relative; }
 .kpi-semaforo::after{ content:''; position:absolute; top:8px; right:8px; width:10px; height:10px; border-radius:50%; }
@@ -464,6 +466,22 @@ table.tbl tr:hover td{ background:#fafbfc; }
 const SUPABASE_URL = 'https://elwugzjpfpxjyoyeeoaf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_imAQfXVuTQYav4-KM5R1rg_1eJnm8t5';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── UTILIDADES GLOBALES ──
+function escapeHTML(str){
+  if(str==null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function limpiarTEDGlobal(t){
+  if(!t) return '-';
+  const m=String(t).match(/^E\d+/i);
+  return m?m[0].toUpperCase():String(t);
+}
+// Control de búsquedas concurrentes
+let _busquedaEnCurso = false;
+function mostrarSpinner(contenedor){
+  contenedor.innerHTML = '<div class="card" style="text-align:center;padding:40px"><div style="display:inline-block;width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:var(--azul);border-radius:50%;animation:spin 0.8s linear infinite"></div><div style="margin-top:14px;color:#64748b;font-size:14px;font-weight:600">Buscando...</div></div>';
+}
 let _expData = null, _charts = {};
 const COLORES = ['#0033A0','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899','#6366f1','#14b8a6','#fb923c'];
 const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
@@ -828,9 +846,34 @@ function cambiarTipoGrafico(id,tipo){
   inst.chart=new Chart(ctx.getContext('2d'),cfg);
 }
 
+let _recData=[]; // datos de rechazos para filtrar
+
 async function cargarGraficosRechazos(){
   const{data,error}=await sb.from('rechazos').select('fecha,tipo_transferencia,subdireccion,rut').limit(10000);
   if(error||!data) return;
+  _recData=data;
+
+  // Poblar selector de meses
+  const mesesDisp=[...new Set(data.map(d=>d.fecha?.slice(0,7)).filter(Boolean))].sort();
+  const opcionesMes=mesesDisp.map(m=>{ const[y,mo]=m.split('-'); const lbl=mo?MESES[parseInt(mo)]+' '+y:m; return `<option value="${m}">${lbl}</option>`; }).join('');
+
+  const secR=document.getElementById('dash-rechazos');
+  secR.innerHTML=`<div style="margin-top:24px">
+    <div class="grupo-titulo" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <span>⚠️ Análisis de Rechazos Bancarios</span>
+      <select id="rec-filtro-mes" onchange="renderGraficosRechazos()" style="font-size:13px;padding:6px 10px;border:1px solid var(--borde);border-radius:8px;font-weight:normal;text-transform:none;letter-spacing:normal">
+        <option value="">Todos los meses</option>${opcionesMes}
+      </select>
+    </div>
+    <div class="dash-grid-2"><div class="card" id="dashcard-rec-mes"></div><div class="card" id="dashcard-rec-tipo"></div><div class="card" id="dashcard-rec-sub"></div></div>
+  </div>`;
+  setTimeout(()=>renderGraficosRechazos(),80);
+}
+
+function renderGraficosRechazos(){
+  const mesSel=document.getElementById('rec-filtro-mes')?.value||'';
+  const data=mesSel?_recData.filter(d=>d.fecha?.slice(0,7)===mesSel):_recData;
+
   const porMesR={},porTipoR={},porSubR={};
   data.forEach(d=>{
     const m=d.fecha?.slice(0,7)||'Sin fecha'; if(!porMesR[m]) porMesR[m]=new Set(); porMesR[m].add(d.rut||'?');
@@ -841,13 +884,10 @@ async function cargarGraficosRechazos(){
   const recMesL=mesesR.map(m=>{ const[y,mo]=m.split('-'); return mo?MESES[parseInt(mo)]+' '+y:m; });
   const tiposR=Object.keys(porTipoR).sort((a,b)=>porTipoR[b]-porTipoR[a]);
   const subsR=Object.keys(porSubR).sort((a,b)=>porSubR[b]-porSubR[a]);
-  const secR=document.getElementById('dash-rechazos');
-  secR.innerHTML=`<div style="margin-top:24px"><div class="grupo-titulo">⚠️ Análisis de Rechazos Bancarios</div><div class="dash-grid-2"><div class="card" id="dashcard-rec-mes"></div><div class="card" id="dashcard-rec-tipo"></div><div class="card" id="dashcard-rec-sub"></div></div></div>`;
-  setTimeout(()=>{
-    renderChart('rec-mes','📅 Rechazos por Mes',recMesL,mesesR.map(m=>porMesR[m].size),'#ef4444',false,false);
-    renderChart('rec-tipo','💸 Por Tipo Transferencia',tiposR,tiposR.map(t=>porTipoR[t]),'#f59e0b',false,false);
-    renderChart('rec-sub','🏛️ Por Subdirección',subsR,subsR.map(s=>porSubR[s]),'#8b5cf6',false,false);
-  },80);
+
+  renderChart('rec-mes','📅 Rechazos por Mes',recMesL,mesesR.map(m=>porMesR[m].size),'#ef4444',false,false);
+  renderChart('rec-tipo','💸 Por Tipo Transferencia',tiposR,tiposR.map(t=>porTipoR[t]),'#f59e0b',false,false);
+  renderChart('rec-sub','🏛️ Por Subdirección',subsR,subsR.map(s=>porSubR[s]),'#8b5cf6',false,false);
 }
 
 // ── BUSQUEDA ──
@@ -867,17 +907,19 @@ function cambiarPestana(tipo,btn){
 function ejecutarBusqueda(){ if(pestanaActiva==='ted') buscarExpediente(); else buscarPorRutOFolio(pestanaActiva); }
 
 async function buscarExpediente(){
+  if(_busquedaEnCurso) return; // evitar búsquedas concurrentes
   const ted=document.getElementById('input-busqueda').value.trim();
   const resultado=document.getElementById('resultado');
-  resultado.innerHTML='';
   if(!ted){alert('Ingresa un TED');return;}
   const{data:{session}}=await sb.auth.getSession();
   if(!session){mostrarAuth();return;}
+  _busquedaEnCurso=true;
+  mostrarSpinner(resultado);
   try{
     const tedBase=(ted.includes('/')?ted.split('/')[0].trim():ted.match(/^E\d+/i)?ted.match(/^E\d+/i)[0]:ted.trim()).toUpperCase();
     const[expRes,recRes]=await Promise.all([
       sb.from('expedientes').select('*').ilike('numero_ted',ted).limit(5000),
-      sb.from('rechazos').select('*').ilike('ted_pago',tedBase).order('fecha',{ascending:true})
+      sb.from('rechazos').select('*').ilike('ted_pago',tedBase).order('fecha',{ascending:true}).limit(100)
     ]);
     if(expRes.error){resultado.innerHTML='<div class="card"><p>Error consultando</p></div>';return;}
     if(!expRes.data||expRes.data.length===0){resultado.innerHTML=`<div class="card"><h3>Sin resultados</h3><p>No existe el expediente: <strong>${ted}</strong></p></div>`;return;}
@@ -914,7 +956,7 @@ async function buscarExpediente(){
     if(rechazos.length===0){
       recHTML='<div style="background:#ecfdf5;color:#065f46;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:bold;margin-bottom:12px;border-left:4px solid #10b981">✅ Sin rechazos bancarios</div>';
     } else {
-      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${r.beneficiario||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div>${(()=>{ const saldoF2=parseFloat(r.saldo_final)||0;
+      recHTML=`<div style="background:#fef2f2;border-radius:10px;padding:14px;margin-bottom:12px;border-left:4px solid #ef4444"><div style="color:#991b1b;font-size:14px;font-weight:bold;margin-bottom:10px">⚠️ Rechazos Bancarios (${rechazos.length})</div>${rechazos.map((r,i)=>`<div style="background:white;border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px"><div style="font-weight:bold;color:#991b1b;margin-bottom:6px">Rechazo #${i+1}</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Fecha</span><br>${fmtF(r.fecha)}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">RUT</span><br>${r.rut||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Beneficiario</span><br>${escapeHTML(r.beneficiario)||'-'}</div><div><span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700">Cuenta</span><br>${r.cuenta_corriente||'-'}</div>${(()=>{ const saldoF2=parseFloat(r.saldo_final)||0;
               const ceR=r.numero_doc_solucion&&String(r.numero_doc_solucion).trim()&&String(r.numero_doc_solucion).toLowerCase()!=='null'&&String(r.numero_doc_solucion).toLowerCase()!=='empty'?String(r.numero_doc_solucion).trim():null;
               const esCE2=ceR&&(/^CE\d+/i.test(ceR)||/^\d+$/.test(ceR));
               const sol2=saldoF2===0&&esCE2;
@@ -937,21 +979,27 @@ async function buscarExpediente(){
 
     resultado.innerHTML = htmlExp;
 
-  } catch(err){ resultado.innerHTML='<div class="card"><h3>Error</h3><p>Ocurrió un problema</p></div>'; }
+  } catch(err){ 
+    const esRed = err.message && (err.message.includes('fetch')||err.message.includes('network'));
+    resultado.innerHTML='<div class="card"><h3>'+(esRed?'⚠️ Sin conexión':'Error')+'</h3><p>'+(esRed?'No se pudo conectar al servidor. Verifica tu conexión a internet.':'Ocurrió un problema al buscar. Intenta nuevamente.')+'</p></div>'; 
+  } finally {
+    _busquedaEnCurso=false;
+  }
 }
 
 async function buscarPorRutOFolio(tipo){
+  if(_busquedaEnCurso) return; // evitar búsquedas concurrentes
   const val=document.getElementById('input-busqueda').value.trim();
   const resultado=document.getElementById('resultado');
-  resultado.innerHTML='';
   if(!val){alert('Ingresa un '+(tipo==='rut'?'RUT':'folio'));return;}
   const{data:{session}}=await sb.auth.getSession();
   if(!session){mostrarAuth();return;}
-  resultado.innerHTML='<div class="card"><p style="color:#64748b">⏳ Buscando...</p></div>';
+  _busquedaEnCurso=true;
+  mostrarSpinner(resultado);
   try{
     let devRes;
-    if(tipo==='rut') devRes=await sb.from('devengo').select('*').ilike('rut',val);
-    else devRes=await sb.from('devengo').select('*').ilike('proyecto',val+'%');
+    if(tipo==='rut') devRes=await sb.from('devengo').select('*').ilike('rut',val).limit(2000);
+    else devRes=await sb.from('devengo').select('*').ilike('proyecto',val+'%').limit(2000);
     if(devRes.error||!devRes.data||devRes.data.length===0){resultado.innerHTML=`<div class="card"><h3>Sin resultados</h3><p>No se encontraron registros para: <strong>${val}</strong></p></div>`;return;}
     const filas=devRes.data;
     // Agrupar TEDs por base numérica: E7332AB + E7332AC → E7332
@@ -968,14 +1016,15 @@ async function buscarPorRutOFolio(tipo){
     // Para cada base, buscar el expediente y guardar las variantes
     let expMap={},tedVariantes={},recPorRut={},nombrePorRut={};
 
-    // Buscar nombres en tabla beneficiarios
-    for(const rut of rutsUnicos){
-      const rutNum=rut.split('-')[0];
-      const benRes=await sb.from('beneficiarios').select('razon_social,dv').eq('rut',rutNum).limit(1);
-      if(benRes.data&&benRes.data.length>0){
-        const b=benRes.data[0];
-        nombrePorRut[rut]=b.razon_social+(b.dv?'-'+b.dv:'');
-      }
+    // Buscar nombres en tabla beneficiarios — UNA SOLA QUERY para todos los RUTs
+    const rutNums = rutsUnicos.map(r=>r.split('-')[0]);
+    if(rutNums.length>0){
+      const benRes=await sb.from('beneficiarios').select('rut,razon_social,dv').in('rut',rutNums).limit(500);
+      (benRes.data||[]).forEach(b=>{
+        // Mapear de vuelta al formato original del RUT
+        const original = rutsUnicos.find(r=>r.split('-')[0]===String(b.rut));
+        if(original) nombrePorRut[original]=b.razon_social+(b.dv?'-'+b.dv:'');
+      });
     }
     for(const base of tedsBase){
       const expRes2=await sb.from('expedientes').select('*').ilike('numero_ted',base+'%').limit(10);
@@ -985,19 +1034,21 @@ async function buscarPorRutOFolio(tipo){
     }
     // tedsUnicos ahora son las bases (sin letras)
     const tedsUnicos=tedsBase;
-    for(const rut of rutsUnicos){
-      const recRes2=await sb.from('rechazos').select('*').ilike('rut',rut).order('fecha',{ascending:false}).limit(20);
-      if(recRes2.data&&recRes2.data.length>0){
-        // Guardar TODOS los rechazos del RUT para filtrar por TED después
-        recPorRut[rut] = recRes2.data;
-      }
+    // Rechazos — UNA SOLA QUERY para todos los RUTs
+    if(rutsUnicos.length>0){
+      const recRes2=await sb.from('rechazos').select('*').in('rut',rutsUnicos).order('fecha',{ascending:false}).limit(200);
+      (recRes2.data||[]).forEach(r=>{
+        const k = String(r.rut||'').trim();
+        if(!recPorRut[k]) recPorRut[k]=[];
+        recPorRut[k].push(r);
+      });
     }
     const fmtM2=v=>'$'+Math.round(parseFloat(v)||0).toLocaleString('es-CL');
     // Obtener nombre desde beneficiarios
     const rutBen = rutsUnicos[0]||val;
     const nombreBen = nombrePorRut[rutBen]||null;
     const headerInfo = nombreBen
-      ? `<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;margin-bottom:14px;border-left:4px solid var(--azul);display:flex;align-items:center;gap:12px"><span style="font-size:22px">👤</span><div><div style="font-weight:800;font-size:16px;color:var(--azul)">${nombreBen}</div><div style="font-size:13px;color:#64748b">RUT: ${rutBen}</div></div></div>`
+      ? `<div style="background:#eff6ff;border-radius:10px;padding:12px 16px;margin-bottom:14px;border-left:4px solid var(--azul);display:flex;align-items:center;gap:12px"><span style="font-size:22px">👤</span><div><div style="font-weight:800;font-size:16px;color:var(--azul)">${escapeHTML(nombreBen)}</div><div style="font-size:13px;color:#64748b">RUT: ${escapeHTML(rutBen)}</div></div></div>`
       : '';
     let html=`<div class="card"><h3>${tipo==='rut'?'👤 Resultados por RUT':'📄 Resultados por Folio'}: ${val}</h3>${headerInfo}`;
 
@@ -1055,7 +1106,7 @@ async function buscarPorRutOFolio(tipo){
                 : saldoF===0 && !esCE
                   ? ' — <span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">✅ Solucionado</span>'
                   : ' — <span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:bold">⏳ Pendiente ($'+Math.round(saldoF).toLocaleString('es-CL')+')</span>';
-              html+=`<div style="font-size:12px;color:#64748b;margin-bottom:3px">${fmtF(r.fecha)} — ${r.beneficiario||''} — ${r.rut||''} — Cta: ${r.cuenta_corriente||''}${ceTag}</div>`;
+              html+=`<div style="font-size:12px;color:#64748b;margin-bottom:3px">${fmtF(r.fecha)} — ${escapeHTML(r.beneficiario)} — ${escapeHTML(r.rut)} — Cta: ${escapeHTML(r.cuenta_corriente)}${ceTag}</div>`;
             });
             html+=`</div>`;
           }
@@ -1069,7 +1120,7 @@ async function buscarPorRutOFolio(tipo){
             const limpiarTED2 = t => { if(!t) return '-'; const m=String(t).match(/^E\d+/i); return m?m[0]:String(t); };
             const detalleHTML = filasDelTed.map(r=>{
               const nom = nombrePorRut[r.rut||'']||'';
-              return `<tr><td>${r.rut||'-'}</td><td>${nom||'<span style="color:#94a3b8;font-style:italic">Sin nombre</span>'}</td><td>${limpiarTED2(r.nro_ref||'-')}</td><td><strong style="color:#059669">${fmtM2(r.pagos)}</strong></td><td>${fmtF(r.emision)}</td></tr>`;
+              return `<tr><td>${escapeHTML(r.rut)||'-'}</td><td>${nom?escapeHTML(nom):'<span style="color:#94a3b8;font-style:italic">Sin nombre</span>'}</td><td>${limpiarTED2(r.nro_ref||'-')}</td><td><strong style="color:#059669">${fmtM2(r.pagos)}</strong></td><td>${fmtF(r.emision)}</td></tr>`;
             }).join('');
             html+=`<div style="margin-top:10px">
               <button onclick="const el=document.getElementById('${detUID}');el.style.display=el.style.display==='none'?'block':'none';this.innerHTML=el.style.display==='none'?'📋 Ver Detalle de Pagos (${filasDelTed.length})':'▼ Ocultar Detalle'" 
@@ -1104,7 +1155,12 @@ async function buscarPorRutOFolio(tipo){
     }
     html+=`</div>`;
     resultado.innerHTML=html;
-  } catch(err){ resultado.innerHTML='<div class="card"><h3>Error General</h3><p>Ocurrió un problema</p></div>'; }
+  } catch(err){ 
+    const esRed = err.message && (err.message.includes('fetch')||err.message.includes('network'));
+    resultado.innerHTML='<div class="card"><h3>'+(esRed?'⚠️ Sin conexión':'Error')+'</h3><p>'+(esRed?'No se pudo conectar al servidor. Verifica tu conexión.':'Ocurrió un problema al buscar. Intenta nuevamente.')+'</p></div>'; 
+  } finally {
+    _busquedaEnCurso=false;
+  }
 }
 
 // ── RECHAZOS UPLOAD ──
