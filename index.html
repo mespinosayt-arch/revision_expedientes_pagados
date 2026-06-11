@@ -814,9 +814,9 @@ function mostrarDetalle(tipo){
 }
 
 // ── CHARTS ──
-function renderChart(id,titulo,labels,values,colorBase,useLog=false,isMonto=false){
+function renderChart(id,titulo,labels,values,colorBase,useLog=false,isMonto=false,extraInfo=null){
   const colors=labels.map((_,i)=>COLORES[i%COLORES.length]);
-  _charts[id]={meta:{labels,values,colors,titulo,useLog,isMonto},chart:null};
+  _charts[id]={meta:{labels,values,colors,titulo,useLog,isMonto,extraInfo},chart:null};
   const card=document.getElementById('dashcard-'+id);
   if(!card) return;
   card.innerHTML=`<h3>${titulo}</h3><div class="chart-select-wrap"><label>Tipo:</label><select class="chart-select" onchange="cambiarTipoGrafico('${id}',this.value)"><option value="barras_h">📊 Barras Horiz.</option><option value="barras_v">📈 Barras Vert.</option><option value="torta">🥧 Torta</option><option value="dona">🍩 Dona</option><option value="linea">📉 Línea</option><option value="pareto">📐 Pareto</option></select></div><div class="chart-canvas-wrap"><canvas id="canvas-${id}"></canvas></div>`;
@@ -843,13 +843,26 @@ function cambiarTipoGrafico(id,tipo){
     let acc=0; const cum=sV.map(v=>{acc+=v;return Math.round(acc/tot*100);});
     cfg={type:'bar',data:{labels:sL,datasets:[{type:'bar',data:sV,backgroundColor:colors,borderRadius:4,yAxisID:'y'},{type:'line',data:cum,borderColor:'#ef4444',backgroundColor:'transparent',pointRadius:3,tension:0.3,yAxisID:'y2'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{callback:tickCb}},y2:{position:'right',min:0,max:100,ticks:{callback:v=>v+'%'},grid:{drawOnChartArea:false}}}}};
   }
+  // Tooltip extra (ej: "26 exp · 1234 ben")
+  if(inst.meta.extraInfo){
+    cfg.options=cfg.options||{};
+    cfg.options.plugins=cfg.options.plugins||{};
+    cfg.options.plugins.tooltip={
+      callbacks:{
+        label:(c)=>{
+          const i=c.dataIndex;
+          return inst.meta.extraInfo[i]||c.formattedValue;
+        }
+      }
+    };
+  }
   inst.chart=new Chart(ctx.getContext('2d'),cfg);
 }
 
 let _recData=[]; // datos de rechazos para filtrar
 
 async function cargarGraficosRechazos(){
-  const{data,error}=await sb.from('rechazos').select('fecha,tipo_transferencia,subdireccion,rut').limit(10000);
+  const{data,error}=await sb.from('rechazos').select('fecha,tipo_transferencia,subdireccion,rut,ted_pago').limit(10000);
   if(error||!data) return;
   _recData=data;
 
@@ -874,20 +887,26 @@ function renderGraficosRechazos(){
   const mesSel=document.getElementById('rec-filtro-mes')?.value||'';
   const data=mesSel?_recData.filter(d=>d.fecha?.slice(0,7)===mesSel):_recData;
 
+  // Por cada categoría guardamos: TEDs únicos (expedientes) y RUTs únicos (beneficiarios)
+  const nuevo=()=>({teds:new Set(),ruts:new Set()});
   const porMesR={},porTipoR={},porSubR={};
   data.forEach(d=>{
-    const m=d.fecha?.slice(0,7)||'Sin fecha'; if(!porMesR[m]) porMesR[m]=new Set(); porMesR[m].add(d.rut||'?');
-    const t=d.tipo_transferencia||'Sin tipo'; if(!porTipoR[t]) porTipoR[t]=0; porTipoR[t]++;
-    const s=d.subdireccion||'Sin subdirección'; if(!porSubR[s]) porSubR[s]=0; porSubR[s]++;
+    const ted=d.ted_pago?String(d.ted_pago).trim():null;
+    const rut=d.rut?String(d.rut).trim():null;
+    const m=d.fecha?.slice(0,7)||'Sin fecha'; if(!porMesR[m]) porMesR[m]=nuevo(); if(ted)porMesR[m].teds.add(ted); if(rut)porMesR[m].ruts.add(rut);
+    const t=d.tipo_transferencia||'Sin tipo'; if(!porTipoR[t]) porTipoR[t]=nuevo(); if(ted)porTipoR[t].teds.add(ted); if(rut)porTipoR[t].ruts.add(rut);
+    const s=d.subdireccion||'Sin subdirección'; if(!porSubR[s]) porSubR[s]=nuevo(); if(ted)porSubR[s].teds.add(ted); if(rut)porSubR[s].ruts.add(rut);
   });
   const mesesR=Object.keys(porMesR).sort();
   const recMesL=mesesR.map(m=>{ const[y,mo]=m.split('-'); return mo?MESES[parseInt(mo)]+' '+y:m; });
-  const tiposR=Object.keys(porTipoR).sort((a,b)=>porTipoR[b]-porTipoR[a]);
-  const subsR=Object.keys(porSubR).sort((a,b)=>porSubR[b]-porSubR[a]);
+  const tiposR=Object.keys(porTipoR).sort((a,b)=>porTipoR[b].ruts.size-porTipoR[a].ruts.size);
+  const subsR=Object.keys(porSubR).sort((a,b)=>porSubR[b].ruts.size-porSubR[a].ruts.size);
 
-  renderChart('rec-mes','📅 Rechazos por Mes',recMesL,mesesR.map(m=>porMesR[m].size),'#ef4444',false,false);
-  renderChart('rec-tipo','💸 Por Tipo Transferencia',tiposR,tiposR.map(t=>porTipoR[t]),'#f59e0b',false,false);
-  renderChart('rec-sub','🏛️ Por Subdirección',subsR,subsR.map(s=>porSubR[s]),'#8b5cf6',false,false);
+  const infoExtra=(obj,keys)=>keys.map(k=>obj[k].teds.size+' exp · '+obj[k].ruts.size+' ben');
+
+  renderChart('rec-mes','📅 Rechazos por Mes',recMesL,mesesR.map(m=>porMesR[m].ruts.size),'#ef4444',false,false,infoExtra(porMesR,mesesR));
+  renderChart('rec-tipo','💸 Por Tipo Transferencia',tiposR,tiposR.map(t=>porTipoR[t].ruts.size),'#f59e0b',false,false,infoExtra(porTipoR,tiposR));
+  renderChart('rec-sub','🏛️ Por Subdirección',subsR,subsR.map(s=>porSubR[s].ruts.size),'#8b5cf6',false,false,infoExtra(porSubR,subsR));
 }
 
 // ── BUSQUEDA ──
